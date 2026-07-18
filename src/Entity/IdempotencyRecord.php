@@ -37,7 +37,7 @@ class IdempotencyRecord
     private int $responseStatus = 201;
 
     /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true], updatable: false)]
+    #[ORM\Column(type: Types::JSON, updatable: false)]
     private array $responseBody;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, updatable: false)]

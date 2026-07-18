@@ -1,0 +1,6 @@
+doctrine:
+    dbal:
+        # Query-count assertions need DBAL profiling even when CI runs the test
+        # kernel with APP_DEBUG=0.
+        profiling: true
+        profiling_collect_backtrace: false

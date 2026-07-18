@@ -30,7 +30,7 @@ final class RepositoryQueryTest extends KernelTestCase
     {
         self::bootKernel();
         $this->entityManager = self::getContainer()->get(EntityManagerInterface::class);
-        $this->queries = self::getContainer()->get('doctrine.debug_data_holder');
+        $this->queries = self::getContainer()->get(BacktraceDebugDataHolder::class);
 
         $metadata = $this->entityManager->getMetadataFactory()->getAllMetadata();
         $schema = new SchemaTool($this->entityManager);

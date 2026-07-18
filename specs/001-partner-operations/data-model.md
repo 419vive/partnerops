@@ -262,7 +262,7 @@ Represents a 24-hour API request reservation and replay result.
 | `request_fingerprint` | char(64) | SHA-256 of canonical validated input |
 | `service_request_id` | bigint | Required once successful |
 | `response_status` | smallint | `201` for v1 creation |
-| `response_body` | jsonb | Exact safe response document for replay |
+| `response_body` | json | Exact safe response document; preserves key order for byte-identical replay |
 | `created_at` | UTC timestamp | Immutable |
 | `expires_at` | UTC timestamp | Created time + 24 hours |
 

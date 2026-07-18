@@ -167,7 +167,7 @@ final class ClientAdminTest extends WebTestCase
         }
         $this->entityManager->flush();
 
-        $queries = static::getContainer()->get('doctrine.debug_data_holder');
+        $queries = static::getContainer()->get(BacktraceDebugDataHolder::class);
         self::assertInstanceOf(BacktraceDebugDataHolder::class, $queries);
         $queries->reset();
         $this->browser->request('GET', '/admin/clients');

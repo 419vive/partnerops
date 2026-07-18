@@ -83,7 +83,10 @@ jobs:
         run: composer analyse
 
       - name: Run backend test suite
-        run: php bin/phpunit
+        run: |
+          php bin/console doctrine:database:drop --env=test --force --if-exists
+          php bin/console doctrine:database:create --env=test
+          php bin/phpunit
 
       - name: Compile production assets
         run: php bin/console asset-map:compile --env=prod --no-debug

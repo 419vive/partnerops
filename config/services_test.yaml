@@ -7,3 +7,7 @@ services:
 
     App\DataFixtures\:
         resource: '../src/DataFixtures/'
+
+    Doctrine\Bundle\DoctrineBundle\Middleware\BacktraceDebugDataHolder:
+        alias: doctrine.debug_data_holder
+        public: true
