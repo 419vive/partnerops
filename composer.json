@@ -81,7 +81,8 @@
             "@analyse",
             "@lint",
             "@php bin/console doctrine:migrations:up-to-date --no-interaction",
-            "@php bin/console doctrine:schema:validate",
+            "@php bin/console doctrine:schema:validate --skip-sync",
+            "@php scripts/verify-schema-contract.php",
             "@test",
             "@php bin/console asset-map:compile"
         ]

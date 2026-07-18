@@ -67,12 +67,8 @@ jobs:
         run: |
           php bin/console doctrine:migrations:migrate --env=test --no-interaction
           php bin/console doctrine:migrations:up-to-date --env=test
-          if ! php bin/console doctrine:schema:validate --env=test; then
-            echo "::group::Doctrine schema difference"
-            php bin/console doctrine:schema:update --env=test --dump-sql --complete
-            echo "::endgroup::"
-            exit 1
-          fi
+          php bin/console doctrine:schema:validate --env=test --skip-sync
+          php scripts/verify-schema-contract.php
 
       - name: Verify migration-only database invariants
         run: php scripts/verify-migration-invariants.php
