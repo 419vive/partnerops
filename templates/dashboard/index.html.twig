@@ -1,0 +1,76 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}營運總覽 · {{ app_name }}{% endblock %}
+{% block context_label %}{{ app.user.role.value == 'client' ? app.user.client.name ~ ' 的服務進度' : '跨客戶的今日工作優先順序' }}{% endblock %}
+
+{% block body %}
+    <header class="page-heading">
+        <div>
+            <span class="eyebrow">{{ now|date('Y · m · d') }} / Command view</span>
+            <h1>把風險，<br><em>收進視野。</em></h1>
+            <p>{{ app.user.role.value == 'client' ? '查看請求狀態、公開討論與本期顧問額度，不必再追問進度。' : '先處理逾期與緊急事項，再讓每個承諾有清楚的下一步。' }}</p>
+        </div>
+        <div class="page-actions">
+            <a class="button button--signal" href="{{ path('app_request_new') }}">＋ 建立服務請求</a>
+            <a class="button button--secondary" href="{{ path('app_request_index') }}">檢視全部</a>
+        </div>
+    </header>
+
+    <section class="metric-grid" aria-label="服務營運指標">
+        <article class="metric metric--dark"><span class="metric__label">未結請求</span><strong>{{ counts.open }}</strong><small>正在等待或處理</small></article>
+        <article class="metric {{ counts.overdue > 0 ? 'metric--alert' : '' }}"><span class="metric__label">已逾期</span><strong>{{ counts.overdue }}</strong><small>{{ counts.overdue > 0 ? '今天優先處理' : '目前沒有逾期' }}</small></article>
+        <article class="metric"><span class="metric__label">即將到期</span><strong>{{ counts.dueSoon }}</strong><small>未來七天內</small></article>
+        <article class="metric metric--acid"><span class="metric__label">尚未指派</span><strong>{{ counts.unassigned }}</strong><small>等待明確負責人</small></article>
+        <article class="metric"><span class="metric__label">額度超用</span><strong>{{ overBudgetCount }}</strong><small>本期需要確認</small></article>
+    </section>
+
+    <div class="dashboard-grid">
+        <section class="panel" aria-labelledby="queue-title">
+            <div class="panel__header">
+                <div><h2 id="queue-title">現在該處理什麼</h2><p>依緊急度、期限與建立時間排序</p></div>
+                <a href="{{ path('app_request_index') }}">完整佇列 →</a>
+            </div>
+            <div class="queue-list">
+                {% for item in queue %}
+                    <a class="queue-item" href="{{ path('app_request_show', {publicId: item.publicId}) }}">
+                        <span class="queue-item__title">
+                            <strong>{{ item.title }}</strong>
+                            <small>{{ item.client.name }} · {{ item.assignee ? item.assignee.displayName : '尚未指派' }}</small>
+                        </span>
+                        <span class="badge badge--{{ item.priority.value }}">{{ item.priority.label }}</span>
+                        <span class="deadline {{ item.overdue ? 'deadline--overdue' : '' }}">{{ item.dueAt ? (item.overdue ? '逾期 ' : '到期 ') ~ (item.dueAt|date('m/d H:i')) : '尚未排程' }}</span>
+                    </a>
+                {% else %}
+                    <div class="empty-state"><div><span class="empty-state__mark">✓</span><h2>佇列已清空</h2><p>目前沒有等待處理的服務請求。</p><a class="button button--signal" href="{{ path('app_request_new') }}">建立新請求</a></div></div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <aside class="stack">
+            <section class="panel" aria-labelledby="allowance-title">
+                <div class="panel__header"><div><h2 id="allowance-title">本期顧問額度</h2><p>{{ allowance ? allowance.startsOn|date('m/d') ~ ' — ' ~ allowance.endsOn|date('m/d') : '尚未設定期間' }}</p></div></div>
+                <div class="panel__body">
+                    {% if allowanceSummary %}
+                        {% set width = allowanceSummary.utilizationPercent > 100 ? 100 : allowanceSummary.utilizationPercent %}
+                        <div class="allowance-number"><strong>{{ (allowanceSummary.remainingMinutes / 60)|number_format(1) }}</strong><span>小時可用</span></div>
+                        <div class="progress {{ allowanceSummary.overageMinutes > 0 ? 'progress--over' : '' }}" aria-label="已使用 {{ allowanceSummary.utilizationPercent|number_format(0) }}%"><span style="--progress: {{ width }}%"></span></div>
+                        <p class="help-text">已使用 {{ allowanceSummary.approvedUsedMinutes }} / {{ allowanceSummary.includedMinutes }} 分鐘</p>
+                        {% if allowanceSummary.overageMinutes > 0 %}<p class="flash flash--warning">已超出 {{ allowanceSummary.overageMinutes }} 分鐘，請確認後續安排。</p>{% endif %}
+                    {% else %}
+                        <div class="empty-state"><div><span class="empty-state__mark">—</span><h2>尚無本期額度</h2><p>{{ is_granted('ROLE_ADMIN') ? '請到客戶管理建立本期額度。' : '請與管理員確認合作期間。' }}</p></div></div>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel__header"><h2>營運原則</h2></div>
+                <div class="panel__body request-facts">
+                    <div class="request-fact"><span>01</span><strong>先看逾期，再看緊急</strong></div>
+                    <div class="request-fact"><span>02</span><strong>每個請求都有負責人</strong></div>
+                    <div class="request-fact"><span>03</span><strong>內部筆記不外洩</strong></div>
+                    <div class="request-fact"><span>04</span><strong>變更完整可追溯</strong></div>
+                </div>
+            </section>
+        </aside>
+    </div>
+{% endblock %}

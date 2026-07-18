@@ -1,0 +1,404 @@
+openapi: 3.1.0
+info:
+  title: PartnerOps Intake API
+  version: 1.0.0
+  license:
+    name: MIT
+    identifier: MIT
+  description: >-
+    Client-scoped API for creating and retrieving PartnerOps service requests.
+    Tokens are issued in the administrator UI and sent only in the Authorization
+    header. Every error uses RFC 9457 Problem Details.
+servers:
+  - url: /
+    description: Same origin as the deployed PartnerOps application
+tags:
+  - name: Health
+    description: Dependency-aware deployment probes
+  - name: Requests
+    description: Client-scoped request intake and retrieval
+security:
+  - bearerAuth: []
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      summary: Confirm the application process can answer HTTP
+      security: []
+      responses:
+        '200':
+          description: Process is live
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+              example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: live
+  /health/ready:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      summary: Confirm the application can reach its database
+      security: []
+      responses:
+        '200':
+          description: Application is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: ready
+        '503':
+          $ref: '#/components/responses/NotReady'
+  /api/v1/requests:
+    post:
+      tags: [Requests]
+      operationId: createRequest
+      summary: Create one service request for the credential's client
+      description: >-
+        The client is always derived from the bearer credential. Replaying the
+        same Idempotency-Key and validated body within 24 hours returns the exact
+        original status/body and sets Idempotent-Replayed to true.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestCreate'
+            example:
+              title: 結帳頁面出現重複訂單
+              description: 客戶在手機版送出後收到兩個不同訂單編號，請協助追查。
+              priority: high
+      responses:
+        '201':
+          description: Request created, or the original creation response replayed
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri-reference
+            Idempotent-Replayed:
+              schema:
+                type: boolean
+              description: True only when returning a stored response
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestResource'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationFailed'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+  /api/v1/requests/{publicId}:
+    get:
+      tags: [Requests]
+      operationId: getRequest
+      summary: Retrieve one request owned by the credential's client
+      parameters:
+        - name: publicId
+          in: path
+          required: true
+          description: 26-character request ULID
+          schema:
+            type: string
+            pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/CommentsPage'
+      responses:
+        '200':
+          description: Client-visible request and discussion
+          headers:
+            X-Request-ID:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestResource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: PartnerOps opaque token
+      description: Token format `ptk_<selector>.<secret>`; header use only.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Credential-scoped printable key retained for 24 hours
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 128
+        pattern: '^[\x21-\x7E]+$'
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: Optional caller correlation ID; invalid values are replaced
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 64
+        pattern: '^[A-Za-z0-9._-]+$'
+    CommentsPage:
+      name: commentsPage
+      in: query
+      required: false
+      description: Newest-first comment page; each page is chronological and contains 50 items
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+  headers:
+    RequestId:
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 64
+      description: Server-accepted or generated trace identifier
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [live, ready]
+    RequestCreate:
+      type: object
+      additionalProperties: false
+      required: [title, description, priority]
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 160
+        description:
+          type: string
+          minLength: 10
+          maxLength: 10000
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        dueAt:
+          description: Optional requested due instant; team may revise it
+          type: [string, 'null']
+          format: date-time
+    RequestResource:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - title
+        - description
+        - priority
+        - status
+        - dueAt
+        - assignee
+        - createdAt
+        - updatedAt
+        - comments
+        - commentsPagination
+      properties:
+        id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        title:
+          type: string
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+        status:
+          type: string
+          enum: [new, in_progress, waiting_client, resolved, closed]
+        dueAt:
+          type: [string, 'null']
+          format: date-time
+        assignee:
+          oneOf:
+            - $ref: '#/components/schemas/PersonSummary'
+            - type: 'null'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        comments:
+          type: array
+          description: Client-visible comments only; internal notes never appear
+          items:
+            $ref: '#/components/schemas/CommentResource'
+        commentsPagination:
+          $ref: '#/components/schemas/Pagination'
+    Pagination:
+      type: object
+      additionalProperties: false
+      required: [page, perPage, total, pages]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        perPage:
+          type: integer
+          enum: [50]
+        total:
+          type: integer
+          minimum: 0
+        pages:
+          type: integer
+          minimum: 1
+    PersonSummary:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+    CommentResource:
+      type: object
+      additionalProperties: false
+      required: [id, body, author, createdAt]
+      properties:
+        id:
+          type: string
+          pattern: '^[0-9A-HJKMNP-TV-Z]{26}$'
+        body:
+          type: string
+        author:
+          $ref: '#/components/schemas/PersonSummary'
+        createdAt:
+          type: string
+          format: date-time
+    Problem:
+      type: object
+      additionalProperties: true
+      required: [type, title, status, code, detail, instance, traceId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          pattern: '^[a-z0-9_]+$'
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        traceId:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+    ValidationError:
+      type: object
+      additionalProperties: false
+      required: [field, code, message]
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+  responses:
+    BadRequest:
+      description: Malformed JSON, missing idempotency key, or invalid headers
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unauthorized:
+      description: Missing, malformed, unknown, revoked, or inactive credential
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+          example:
+            type: /problems/unauthorized
+            title: Unauthorized
+            status: 401
+            code: unauthorized
+            detail: Valid authentication is required.
+            instance: /api/v1/requests
+            traceId: 01JZEXAMPLETRACE0000000000
+    NotFound:
+      description: Missing or non-client-owned resource; responses are identical
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Conflict:
+      description: Idempotency key payload conflict or concurrent update conflict
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    ValidationFailed:
+      description: Syntactically valid input failed field or business validation
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    RateLimited:
+      description: Credential or source request limit exceeded
+      headers:
+        Retry-After:
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        RateLimit-Limit:
+          schema:
+            type: integer
+        RateLimit-Remaining:
+          schema:
+            type: integer
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    NotReady:
+      description: Application process is live but the database is unavailable
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'

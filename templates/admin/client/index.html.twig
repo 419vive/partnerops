@@ -1,0 +1,50 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}客戶與預算 · {{ app_name }}{% endblock %}
+{% block context_label %}客戶關係、服務額度與風險集中管理。{% endblock %}
+
+{% block body %}
+    <header class="page-heading">
+        <div>
+            <span class="eyebrow">Client portfolio</span>
+            <h1>客戶與<em>預算</em></h1>
+            <p>掌握每個合作帳戶的未結請求、逾期風險與本期顧問額度。</p>
+        </div>
+        <div class="page-actions">
+            <a class="button button--signal" href="{{ path('app_admin_client_new') }}">＋ 建立客戶</a>
+        </div>
+    </header>
+
+    <section class="panel" aria-labelledby="client-list-title">
+        <div class="panel__header">
+            <div><h2 id="client-list-title">合作帳戶</h2><p>{{ rows|length }} 個客戶帳戶</p></div>
+        </div>
+        <div class="data-table-wrap">
+            <table class="data-table">
+                <thead><tr><th>客戶</th><th>狀態</th><th>未結 / 逾期</th><th>本期額度</th><th>動作</th></tr></thead>
+                <tbody>
+                {% for row in rows %}
+                    {% set client = row.client %}
+                    <tr>
+                        <td><a href="{{ path('app_admin_client_show', {publicId: client.publicId}) }}">{{ client.name }}</a><br><small>{{ client.slug }}</small></td>
+                        <td><span class="badge {{ client.archived ? 'badge--closed' : 'badge--resolved' }}">{{ client.archived ? '已封存' : '合作中' }}</span></td>
+                        <td><strong>{{ row.counts.open }}</strong> / <span class="{{ row.counts.overdue > 0 ? 'deadline--overdue' : '' }}">{{ row.counts.overdue }}</span></td>
+                        <td>
+                            {% if row.allowanceSummary %}
+                                {% set width = row.allowanceSummary.utilizationPercent > 100 ? 100 : row.allowanceSummary.utilizationPercent %}
+                                <div class="progress {{ row.allowanceSummary.overageMinutes > 0 ? 'progress--over' : '' }}" aria-label="已使用 {{ row.allowanceSummary.utilizationPercent|number_format(0) }}%"><span style="--progress: {{ width }}%"></span></div>
+                                <small>{{ (row.allowanceSummary.approvedUsedMinutes / 60)|number_format(1) }} / {{ (row.allowanceSummary.includedMinutes / 60)|number_format(1) }} 小時</small>
+                            {% else %}
+                                <span class="deadline">尚未設定</span>
+                            {% endif %}
+                        </td>
+                        <td><a class="button button--secondary button--small" href="{{ path('app_admin_client_show', {publicId: client.publicId}) }}">管理</a></td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="5"><div class="empty-state"><div><span class="empty-state__mark">＋</span><h2>還沒有客戶</h2><p>建立第一個合作帳戶，開始管理請求與額度。</p></div></div></td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}建立客戶 · {{ app_name }}{% endblock %}
+{% block context_label %}建立清楚的客戶資料邊界。{% endblock %}
+
+{% block body %}
+    <header class="page-heading">
+        <div><span class="eyebrow">New client</span><h1>建立<em>客戶</em></h1><p>客戶代碼會出現在內部識別與未來整合設定中。</p></div>
+        <a class="button button--secondary" href="{{ path('app_admin_client_index') }}">返回清單</a>
+    </header>
+    <div class="form-card">
+        {{ form_start(form) }}
+        {{ form_widget(form) }}
+        <div class="form-actions"><button class="button button--signal" type="submit">建立客戶</button><a href="{{ path('app_admin_client_index') }}">取消</a></div>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}

@@ -1,0 +1,48 @@
+# see https://symfony.com/doc/current/reference/configuration/framework.html
+framework:
+    secret: '%env(APP_SECRET)%'
+    default_locale: zh_TW
+    csrf_protection: true
+    http_method_override: false
+    # Forwarded values are considered only when the immediate peer is listed in
+    # SYMFONY_TRUSTED_PROXIES. Deliberately do not trust forwarded Host/Prefix.
+    trusted_headers:
+        - x-forwarded-for
+        - x-forwarded-proto
+        - x-forwarded-port
+
+    # Note that the session will be started ONLY if you read or write from it.
+    session:
+        name: partnerops_session
+        cookie_httponly: true
+        cookie_samesite: lax
+        cookie_secure: auto
+        gc_maxlifetime: 14400
+
+    rate_limiter:
+        anonymous_api:
+            policy: sliding_window
+            limit: 30
+            interval: '1 minute'
+        credential_api:
+            policy: token_bucket
+            limit: 120
+            rate:
+                interval: '1 minute'
+                amount: 60
+
+    #esi: true
+    #fragments: true
+
+when@test:
+    framework:
+        test: true
+        session:
+            storage_factory_id: session.storage.factory.mock_file
+
+when@prod:
+    framework:
+        session:
+            # TLS terminates at the trusted edge in production. Never let a
+            # missing/malformed forwarded-proto header downgrade the cookie.
+            cookie_secure: true

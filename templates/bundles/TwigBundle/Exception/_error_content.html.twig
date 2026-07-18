@@ -1,0 +1,8 @@
+<section class="error-page">
+    <div>
+        <strong>{{ status_code|default(500) }}</strong>
+        <h1>{% if status_code|default(500) == 404 %}這一頁不存在{% else %}暫時無法完成請求{% endif %}</h1>
+        <p>{% if status_code|default(500) == 404 %}找不到指定內容，或你沒有查看權限。{% else %}系統已保留追蹤編號，請稍後再試。{% endif %}</p>
+        <a class="button button--signal" href="{{ app.user ? path('app_dashboard') : path('app_login') }}">回到安全入口</a>
+    </div>
+</section>

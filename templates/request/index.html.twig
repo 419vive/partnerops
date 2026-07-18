@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}服務請求 · {{ app_name }}{% endblock %}
+{% block context_label %}從進件、指派到解決的完整工作佇列。{% endblock %}
+
+{% block body %}
+    <header class="page-heading">
+        <div><span class="eyebrow">Service queue</span><h1>服務<em>請求</em></h1><p>用狀態、優先級與關鍵字找到真正需要處理的工作。</p></div>
+        <a class="button button--signal" href="{{ path('app_request_new') }}">＋ 建立請求</a>
+    </header>
+
+    <form class="filter-bar" method="get" action="{{ path('app_request_index') }}">
+        <div class="field"><label for="request-q">搜尋</label><input id="request-q" name="q" type="search" value="{{ filters.q|default('') }}" placeholder="標題或需求說明"></div>
+        <div class="field"><label for="request-status">狀態</label><select id="request-status" name="status"><option value="">全部狀態</option>{% for status in statuses %}<option value="{{ status.value }}" {{ filters.status|default('') == status.value ? 'selected' : '' }}>{{ status.label }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="request-priority">優先級</label><select id="request-priority" name="priority"><option value="">全部優先級</option>{% for priority in priorities %}<option value="{{ priority.value }}" {{ filters.priority|default('') == priority.value ? 'selected' : '' }}>{{ priority.label }}</option>{% endfor %}</select></div>
+        <div class="field"><label>&nbsp;</label><button class="button button--small" type="submit">套用篩選</button></div>
+    </form>
+
+    <section class="panel" aria-labelledby="request-list-title">
+        <div class="panel__header"><div><h2 id="request-list-title">工作佇列</h2><p>共 {{ total }} 筆 · 第 {{ page }} / {{ pages }} 頁</p></div></div>
+        <div class="data-table-wrap"><table class="data-table">
+            <thead><tr><th>請求</th><th>客戶</th><th>狀態</th><th>優先級</th><th>負責人</th><th>期限</th></tr></thead>
+            <tbody>{% for item in requests %}<tr>
+                <td><a href="{{ path('app_request_show', {publicId: item.publicId}) }}">{{ item.title }}</a><br><small>{{ item.publicId }}</small></td>
+                <td>{{ item.client.name }}</td>
+                <td><span class="badge badge--{{ item.status.value }}">{{ item.status.label }}</span></td>
+                <td><span class="badge badge--{{ item.priority.value }}">{{ item.priority.label }}</span></td>
+                <td>{{ item.assignee ? item.assignee.displayName : '尚未指派' }}</td>
+                <td><span class="deadline {{ item.overdue ? 'deadline--overdue' : '' }}">{{ item.dueAt ? item.dueAt|date('Y/m/d H:i') : '未排程' }}</span></td>
+            </tr>{% else %}<tr><td colspan="6"><div class="empty-state"><div><span class="empty-state__mark">0</span><h2>找不到符合條件的請求</h2><p>調整篩選條件，或建立一筆新請求。</p><a class="button button--signal" href="{{ path('app_request_new') }}">建立請求</a></div></div></td></tr>{% endfor %}</tbody>
+        </table></div>
+    </section>
+
+    {% if pages > 1 %}<nav class="pagination" aria-label="請求頁碼">{% for i in 1..pages %}<a href="{{ path('app_request_index', filters|merge({page:i})) }}" {{ i == page ? 'aria-current="page"' : '' }}>{{ i }}</a>{% endfor %}</nav>{% endif %}
+{% endblock %}

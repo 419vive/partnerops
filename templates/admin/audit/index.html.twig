@@ -1,0 +1,23 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}稽核紀錄 · {{ app_name }}{% endblock %}
+{% block context_label %}每個重要變更都有可追溯的責任與時間。{% endblock %}
+
+{% block body %}
+    <header class="page-heading"><div><span class="eyebrow">Immutable history</span><h1>稽核<em>紀錄</em></h1><p>只保存允許的操作中繼資料，不記錄密碼、token、留言或請求內容。</p></div></header>
+    <form class="filter-bar" method="get">
+        <div class="field"><label for="audit-client">客戶</label><select id="audit-client" name="client"><option value="">全部客戶</option>{% for client in clients %}<option value="{{ client.publicId }}" {{ filters.client == client.publicId ? 'selected' : '' }}>{{ client.name }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="audit-action">事件</label><select id="audit-action" name="action"><option value="">全部事件</option>{% for action in actions %}<option value="{{ action }}" {{ filters.action == action ? 'selected' : '' }}>{{ action }}</option>{% endfor %}</select></div>
+        <div class="field"><label>&nbsp;</label><button class="button button--small" type="submit">套用篩選</button></div>
+    </form>
+    <section class="panel">
+        <div class="panel__header"><div><h2>操作時間線</h2><p>共 {{ total }} 筆 · 第 {{ page }} / {{ pages }} 頁</p></div></div>
+        <div class="data-table-wrap"><table class="data-table">
+            <thead><tr><th>時間</th><th>事件</th><th>客戶 / 操作者</th><th>主體</th><th>安全中繼資料</th><th>Trace</th></tr></thead>
+            <tbody>{% for event in events %}<tr>
+                <td>{{ event.occurredAt|date('Y/m/d H:i:s') }}</td><td><code>{{ event.action }}</code></td><td>{{ event.client ? event.client.name : '系統' }}<br><small>{{ event.actor ? event.actor.displayName : event.actorType.value }}</small></td><td>{{ event.subjectType }}<br><small>{{ event.subjectPublicId }}</small></td><td><code>{{ event.metadata|json_encode }}</code></td><td><code title="{{ event.traceId }}">{{ event.traceId|slice(0, 12) }}…</code></td>
+            </tr>{% else %}<tr><td colspan="6">這個條件下沒有事件。</td></tr>{% endfor %}</tbody>
+        </table></div>
+    </section>
+    {% if pages > 1 %}<nav class="pagination" aria-label="稽核頁碼">{% for i in 1..pages %}<a href="{{ path('app_admin_audit_index', filters|merge({page:i})) }}" {{ i == page ? 'aria-current="page"' : '' }}>{{ i }}</a>{% endfor %}</nav>{% endif %}
+{% endblock %}

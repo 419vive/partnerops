@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="PartnerOps 長期合作服務營運平台">
+    <meta name="theme-color" content="#0f2923">
+    <title>{% block title %}{{ app_name }}{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22><rect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230f2923%22/><path d=%22M18 44V18h17c8 0 13 4 13 11s-5 12-14 12h-7v3zM27 33h7c3 0 5-1 5-4 0-2-2-3-5-3h-7z%22 fill=%22%23dfff4f%22/></svg>">
+    {% block stylesheets %}{% endblock %}
+    {% block javascripts %}{{ importmap('app') }}{% endblock %}
+</head>
+<body class="{% block body_class %}{% if app.user %}app-layout{% else %}auth-layout{% endif %}{% endblock %}">
+<a class="skip-link" href="#main-content">跳到主要內容</a>
+
+{% if app.user %}
+    <aside class="sidebar" aria-label="主要導覽">
+        <a class="brand" href="{{ path('app_dashboard') }}" aria-label="PartnerOps 儀表板">
+            <span class="brand__mark" aria-hidden="true">P</span>
+            <span>
+                <strong>PartnerOps</strong>
+                <small>Service command</small>
+            </span>
+        </a>
+
+        <p class="sidebar__label">營運工作台</p>
+        <nav class="sidebar__nav">
+            <a href="{{ path('app_dashboard') }}" {% if app.request.attributes.get('_route') == 'app_dashboard' %}aria-current="page"{% endif %}>
+                <span aria-hidden="true">◫</span> 總覽
+            </a>
+            <a href="{{ path('app_request_index') }}" {% if app.request.attributes.get('_route') starts with 'app_request_' %}aria-current="page"{% endif %}>
+                <span aria-hidden="true">↗</span> 服務請求
+            </a>
+            {% if is_granted('ROLE_ADMIN') %}
+                <a href="{{ path('app_admin_client_index') }}" {% if app.request.attributes.get('_route') starts with 'app_admin_client' %}aria-current="page"{% endif %}>
+                    <span aria-hidden="true">◎</span> 客戶與預算
+                </a>
+                <a href="{{ path('app_admin_audit_index') }}" {% if app.request.attributes.get('_route') starts with 'app_admin_audit' %}aria-current="page"{% endif %}>
+                    <span aria-hidden="true">≋</span> 稽核紀錄
+                </a>
+            {% endif %}
+        </nav>
+
+        <div class="sidebar__pulse" aria-label="系統狀態正常">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <span><strong>All systems steady</strong><small>Asia/Taipei · UTC+8</small></span>
+        </div>
+    </aside>
+
+    <div class="workspace">
+        <header class="topbar">
+            <div>
+                <span class="eyebrow">長期合作服務營運</span>
+                <p class="topbar__context">{% block context_label %}今天的優先順序，一眼清楚。{% endblock %}</p>
+            </div>
+            <div class="account">
+                <span class="account__avatar" aria-hidden="true">{{ app.user.displayName|slice(0, 1)|upper }}</span>
+                <span class="account__copy"><strong>{{ app.user.displayName }}</strong><small>{{ app.user.role.label }}</small></span>
+                <form action="{{ path('app_logout') }}" method="post">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token('logout') }}">
+                    <button class="text-button" type="submit">登出</button>
+                </form>
+            </div>
+        </header>
+
+        <main id="main-content" class="main-content" tabindex="-1">
+            {% for type, messages in app.flashes %}
+                {% for message in messages %}
+                    <div class="flash flash--{{ type }}" role="status">{{ message }}</div>
+                {% endfor %}
+            {% endfor %}
+            {% block body %}{% endblock %}
+        </main>
+
+        <footer class="footer">
+            <span>PartnerOps / 可追溯的長期合作</span>
+            <a href="{{ path('health_ready') }}">系統狀態</a>
+        </footer>
+    </div>
+{% else %}
+    <main id="main-content" tabindex="-1">
+        {% block public_body %}{% endblock %}
+    </main>
+{% endif %}
+</body>
+</html>

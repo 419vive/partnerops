@@ -1,0 +1,62 @@
+name: partnerops
+
+services:
+  db:
+    image: postgres:16-bookworm
+    environment:
+      POSTGRES_DB: partnerops
+      POSTGRES_PASSWORD: partnerops_dev
+      POSTGRES_USER: partnerops
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    shm_size: 128mb
+
+  app:
+    build:
+      context: .
+      target: development
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      API_TOKEN_PEPPER: local-only-partnerops-api-token-pepper
+      APP_DEBUG: "1"
+      APP_ENV: dev
+      APP_SECRET: local-only-partnerops-app-secret
+      APP_TIMEZONE: Asia/Taipei
+      DATABASE_URL: postgresql://partnerops:partnerops_dev@db:5432/partnerops?serverVersion=16&charset=utf8
+      DEFAULT_URI: http://localhost:8080
+    ports:
+      - "8080:8080"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+      - /var/lock/apache2:uid=33,gid=33,mode=0770
+      - /var/run/apache2:uid=33,gid=33,mode=0770
+      - /var/www/.composer:uid=33,gid=33,mode=0770
+      - /var/www/html/.phpunit.cache:uid=33,gid=33,mode=0770
+      - /var/www/html/public/assets:uid=33,gid=33,mode=0770
+      - /var/www/html/var:uid=33,gid=33,mode=0770
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+
+volumes:
+  db_data:

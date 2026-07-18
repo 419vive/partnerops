@@ -1,0 +1,101 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ serviceRequest.title }} · {{ app_name }}{% endblock %}
+{% block context_label %}{{ serviceRequest.client.name }} · {{ serviceRequest.publicId }}{% endblock %}
+
+{% block body %}
+    <section class="request-hero" aria-labelledby="request-title">
+        <div class="request-hero__meta">
+            <span class="badge badge--{{ serviceRequest.status.value }}">{{ serviceRequest.status.label }}</span>
+            <span class="badge badge--{{ serviceRequest.priority.value }}">{{ serviceRequest.priority.label }}優先</span>
+            {% if serviceRequest.overdue %}<span class="badge badge--urgent">已逾期</span>{% endif %}
+        </div>
+        <h1 id="request-title">{{ serviceRequest.title }}</h1>
+        <p>{{ serviceRequest.description }}</p>
+    </section>
+
+    <div class="detail-grid">
+        <div class="stack">
+            <section class="panel" aria-labelledby="discussion-title">
+                <div class="panel__header"><div><h2 id="discussion-title">討論與進度</h2><p>{{ commentTotal }} 則留言 · 第 {{ commentPage }} / {{ commentPages }} 頁</p></div></div>
+                <div class="panel__body">
+                    <div class="timeline">
+                        {% for item in timeline %}
+                            <article class="timeline-item {{ item.internal ? 'timeline-item--internal' : '' }} {{ item.kind == 'event' ? 'timeline-item--event' : '' }}">
+                                <div class="timeline-item__meta">{{ item.actor }} · {{ item.occurredAt|date('Y/m/d H:i') }} {% if item.internal %}<span class="badge badge--internal">內部</span>{% endif %}</div>
+                                <p>{{ item.body }}</p>
+                            </article>
+                        {% else %}
+                            <div class="empty-state"><div><span class="empty-state__mark">…</span><h2>還沒有留言</h2><p>留下第一個進度更新或補充資訊。</p></div></div>
+                        {% endfor %}
+                    </div>
+                    {% if commentPages > 1 %}
+                        <nav class="pagination" aria-label="留言分頁">
+                            {% if commentPage > 1 %}<a class="button button--secondary button--small" href="{{ path('app_request_show', {publicId: serviceRequest.publicId, commentsPage: commentPage - 1, timePage: timePage}) }}">較新的留言</a>{% endif %}
+                            <span>第 {{ commentPage }} / {{ commentPages }} 頁</span>
+                            {% if commentPage < commentPages %}<a class="button button--secondary button--small" href="{{ path('app_request_show', {publicId: serviceRequest.publicId, commentsPage: commentPage + 1, timePage: timePage}) }}">較舊的留言</a>{% endif %}
+                        </nav>
+                    {% endif %}
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="comment-title">
+                <div class="panel__header"><div><h2 id="comment-title">新增留言</h2><p>{{ app.user.canManageWork ? '可選擇是否只限團隊內部' : '留言會與負責團隊共享' }}</p></div></div>
+                <div class="panel__body">{{ form_start(commentForm) }}{{ form_widget(commentForm) }}{{ form_end(commentForm) }}</div>
+            </section>
+
+            <section class="panel" aria-labelledby="time-history-title">
+                <div class="panel__header"><div><h2 id="time-history-title">工時紀錄</h2><p>{{ timeTotal }} 筆 · 第 {{ timePage }} / {{ timePages }} 頁</p></div></div>
+                <div class="data-table-wrap"><table class="data-table">
+                    <thead><tr><th>日期</th><th>執行者</th><th>摘要</th><th>分鐘</th><th>可見性</th></tr></thead>
+                    <tbody>{% for entry in timeEntries %}<tr>
+                        <td>{{ entry.workDate|date('Y/m/d') }}</td><td>{{ entry.author.displayName }}</td><td>{{ entry.description }}</td><td><strong>{{ entry.minutes }}</strong></td><td>{{ entry.clientVisible ? '客戶可見' : '僅內部' }}</td>
+                    </tr>{% else %}<tr><td colspan="5">尚未記錄工時。</td></tr>{% endfor %}</tbody>
+                </table></div>
+                {% if timePages > 1 %}
+                    <nav class="pagination panel__body" aria-label="工時分頁">
+                        {% if timePage > 1 %}<a class="button button--secondary button--small" href="{{ path('app_request_show', {publicId: serviceRequest.publicId, commentsPage: commentPage, timePage: timePage - 1}) }}">較新的工時</a>{% endif %}
+                        <span>第 {{ timePage }} / {{ timePages }} 頁</span>
+                        {% if timePage < timePages %}<a class="button button--secondary button--small" href="{{ path('app_request_show', {publicId: serviceRequest.publicId, commentsPage: commentPage, timePage: timePage + 1}) }}">較舊的工時</a>{% endif %}
+                    </nav>
+                {% endif %}
+            </section>
+        </div>
+
+        <aside class="stack">
+            <section class="panel">
+                <div class="panel__header"><h2>請求資訊</h2></div>
+                <div class="panel__body"><dl class="request-facts">
+                    <div class="request-fact"><dt>客戶</dt><dd>{{ serviceRequest.client.name }}</dd></div>
+                    <div class="request-fact"><dt>建立來源</dt><dd>{{ serviceRequest.requester ? serviceRequest.requester.displayName : serviceRequest.createdByCredential.name ~ ' API' }}</dd></div>
+                    <div class="request-fact"><dt>負責人</dt><dd>{{ serviceRequest.assignee ? serviceRequest.assignee.displayName : '尚未指派' }}</dd></div>
+                    <div class="request-fact"><dt>期限</dt><dd class="{{ serviceRequest.overdue ? 'deadline--overdue' : '' }}">{{ serviceRequest.dueAt ? serviceRequest.dueAt|date('Y/m/d H:i') : '未排程' }}</dd></div>
+                    <div class="request-fact"><dt>建立時間</dt><dd>{{ serviceRequest.createdAt|date('Y/m/d H:i') }}</dd></div>
+                    <div class="request-fact"><dt>最後更新</dt><dd>{{ serviceRequest.updatedAt|date('Y/m/d H:i') }}</dd></div>
+                </dl></div>
+            </section>
+
+            <section class="panel">
+                <div class="panel__header"><div><h2>本期額度</h2><p>{{ allowance ? allowance.startsOn|date('m/d') ~ ' — ' ~ allowance.endsOn|date('m/d') : '沒有涵蓋今天的額度' }}</p></div></div>
+                <div class="panel__body">
+                    {% if allowanceSummary %}
+                        {% set width = allowanceSummary.utilizationPercent > 100 ? 100 : allowanceSummary.utilizationPercent %}
+                        <div class="allowance-number"><strong>{{ (allowanceSummary.remainingMinutes / 60)|number_format(1) }}</strong><span>小時可用</span></div>
+                        <div class="progress {{ allowanceSummary.overageMinutes > 0 ? 'progress--over' : '' }}"><span style="--progress: {{ width }}%"></span></div>
+                        <p class="help-text">{{ allowanceSummary.approvedUsedMinutes }} / {{ allowanceSummary.includedMinutes }} 分鐘</p>
+                    {% else %}<p class="help-text">請先由管理員建立涵蓋工作日期的額度期間。</p>{% endif %}
+                </div>
+            </section>
+
+            {% if manageForm %}
+                <section class="panel"><div class="panel__header"><h2>工作安排</h2></div><div class="panel__body">{{ form_start(manageForm) }}{{ form_widget(manageForm) }}{{ form_end(manageForm) }}</div></section>
+
+                {% if transitions|length > 0 %}
+                    <section class="panel"><div class="panel__header"><h2>變更狀態</h2></div><div class="panel__body split-actions">{% for transition in transitions %}{{ form_start(transition.form) }}{{ form_widget(transition.form) }}{{ form_end(transition.form) }}{% endfor %}</div></section>
+                {% endif %}
+
+                <section class="panel"><div class="panel__header"><h2>記錄工時</h2></div><div class="panel__body">{{ form_start(timeForm) }}{{ form_widget(timeForm) }}{{ form_end(timeForm) }}</div></section>
+            {% endif %}
+        </aside>
+    </div>
+{% endblock %}

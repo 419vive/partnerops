@@ -1,0 +1,102 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ client.name }} · {{ app_name }}{% endblock %}
+{% block context_label %}客戶資料、合作額度與存取權限。{% endblock %}
+
+{% block body %}
+    <header class="page-heading">
+        <div>
+            <span class="eyebrow">Client / {{ client.slug }}</span>
+            <h1>{{ client.name }}</h1>
+            <p>{{ client.archived ? '此帳戶已封存；歷史資料維持可讀。' : '合作中帳戶 · 所有新工作都會綁定到這個資料邊界。' }}</p>
+        </div>
+        <div class="page-actions">
+            <a class="button button--secondary" href="{{ path('app_admin_client_index') }}">返回清單</a>
+            {% if not client.archived %}
+                <form method="post" action="{{ path('app_admin_client_archive', {publicId: client.publicId}) }}" onsubmit="return confirm('確定封存這個客戶？所有使用者與 API 憑證會一起停用。')">
+                    <input type="hidden" name="_token" value="{{ csrf_token('archive_client_' ~ client.publicId) }}">
+                    <button class="button button--danger" type="submit">封存客戶</button>
+                </form>
+            {% endif %}
+        </div>
+    </header>
+
+    <section class="metric-grid" aria-label="客戶服務指標">
+        <article class="metric metric--dark"><span class="metric__label">未結請求</span><strong>{{ counts.open }}</strong><small>所有進行中項目</small></article>
+        <article class="metric {{ counts.overdue > 0 ? 'metric--alert' : '' }}"><span class="metric__label">已逾期</span><strong>{{ counts.overdue }}</strong><small>需要立即確認</small></article>
+        <article class="metric"><span class="metric__label">即將到期</span><strong>{{ counts.dueSoon }}</strong><small>未來三天</small></article>
+        <article class="metric metric--acid"><span class="metric__label">尚未指派</span><strong>{{ counts.unassigned }}</strong><small>等待負責人</small></article>
+    </section>
+
+    <div class="dashboard-grid">
+        <div class="stack">
+            <section class="panel">
+                <div class="panel__header"><div><h2>最近服務請求</h2><p>最多顯示 10 筆</p></div><a href="{{ path('app_request_index', {client: client.publicId}) }}">查看全部</a></div>
+                <div class="queue-list">
+                    {% for item in requests %}
+                        <a class="queue-item" href="{{ path('app_request_show', {publicId: item.publicId}) }}">
+                            <span class="queue-item__title"><strong>{{ item.title }}</strong><small>{{ item.publicId }}</small></span>
+                            <span class="badge badge--{{ item.status.value }}">{{ item.status.label }}</span>
+                            <span class="deadline {{ item.overdue ? 'deadline--overdue' : '' }}">{{ item.dueAt ? item.dueAt|date('m/d H:i') : '未排程' }}</span>
+                        </a>
+                    {% else %}<div class="empty-state"><div><span class="empty-state__mark">0</span><h2>尚無服務請求</h2></div></div>{% endfor %}
+                </div>
+            </section>
+
+            <section class="panel">
+                <div class="panel__header"><div><h2>顧問額度歷史</h2><p>分鐘為唯一計算單位</p></div></div>
+                <div class="data-table-wrap"><table class="data-table">
+                    <thead><tr><th>期間</th><th>包含</th><th>已使用</th><th>剩餘 / 超額</th></tr></thead>
+                    <tbody>{% for row in allowanceRows %}<tr>
+                        <td>{{ row.period.startsOn|date('Y/m/d') }} — {{ row.period.endsOn|date('Y/m/d') }}</td>
+                        <td>{{ (row.summary.includedMinutes / 60)|number_format(1) }} 小時</td>
+                        <td>{{ (row.summary.approvedUsedMinutes / 60)|number_format(1) }} 小時</td>
+                        <td>{% if row.summary.overageMinutes > 0 %}<span class="deadline--overdue">超額 {{ row.summary.overageMinutes }} 分</span>{% else %}{{ row.summary.remainingMinutes }} 分{% endif %}</td>
+                    </tr>{% else %}<tr><td colspan="4">尚未設定額度。</td></tr>{% endfor %}</tbody>
+                </table></div>
+            </section>
+
+            <section class="panel">
+                <div class="panel__header"><div><h2>客戶聯絡人</h2><p>停用後仍保留歷史關聯</p></div></div>
+                <div class="data-table-wrap"><table class="data-table">
+                    <thead><tr><th>姓名</th><th>電子郵件</th><th>狀態</th><th>動作</th></tr></thead>
+                    <tbody>{% for user in users %}<tr>
+                        <td>{{ user.displayName }}</td><td>{{ user.email }}</td><td><span class="badge {{ user.active ? 'badge--resolved' : 'badge--closed' }}">{{ user.active ? '啟用' : '停用' }}</span></td>
+                        <td>{% if not client.archived %}<div class="table-actions">
+                            <details class="contact-editor" {{ userEditForms[user.publicId].vars.submitted and not userEditForms[user.publicId].vars.valid ? 'open' : '' }}>
+                                <summary class="text-button">編輯</summary>
+                                <div class="contact-editor__body">
+                                    {{ form_start(userEditForms[user.publicId]) }}
+                                    {{ form_widget(userEditForms[user.publicId]) }}
+                                    <div class="form-actions"><button class="button button--small" type="submit">儲存聯絡人</button></div>
+                                    {{ form_end(userEditForms[user.publicId]) }}
+                                </div>
+                            </details>
+                            {% if user.active %}<form method="post" action="{{ path('app_admin_client_user_deactivate', {publicId: client.publicId, userPublicId: user.publicId}) }}"><input type="hidden" name="_token" value="{{ csrf_token('deactivate_user_' ~ user.publicId) }}"><button class="text-button" type="submit">停用</button></form>{% endif %}
+                        </div>{% endif %}</td>
+                    </tr>{% else %}<tr><td colspan="4">尚無聯絡人。</td></tr>{% endfor %}</tbody>
+                </table></div>
+            </section>
+
+            <section class="panel">
+                <div class="panel__header"><div><h2>API 憑證</h2><p>密鑰只在建立當下顯示一次</p></div></div>
+                <div class="data-table-wrap"><table class="data-table">
+                    <thead><tr><th>名稱</th><th>Prefix</th><th>最後使用</th><th>狀態</th><th>動作</th></tr></thead>
+                    <tbody>{% for credential in credentials %}<tr>
+                        <td>{{ credential.name }}</td><td><code>{{ credential.tokenPrefix }}…</code></td><td>{{ credential.lastUsedAt ? credential.lastUsedAt|date('Y/m/d H:i') : '尚未使用' }}</td><td><span class="badge {{ credential.active ? 'badge--resolved' : 'badge--closed' }}">{{ credential.active ? '啟用' : '撤銷' }}</span></td>
+                        <td>{% if credential.active and not client.archived %}<form method="post" action="{{ path('app_admin_client_credential_revoke', {publicId: client.publicId, credentialPublicId: credential.publicId}) }}"><input type="hidden" name="_token" value="{{ csrf_token('revoke_credential_' ~ credential.publicId) }}"><button class="text-button" type="submit">撤銷</button></form>{% endif %}</td>
+                    </tr>{% else %}<tr><td colspan="5">尚無 API 憑證。</td></tr>{% endfor %}</tbody>
+                </table></div>
+            </section>
+        </div>
+
+        <aside class="stack">
+            <section class="panel"><div class="panel__header"><h2>編輯客戶</h2></div><div class="panel__body">{{ form_start(editForm) }}{{ form_widget(editForm) }}<div class="form-actions"><button class="button button--small" type="submit" {{ client.archived ? 'disabled' : '' }}>儲存變更</button></div>{{ form_end(editForm) }}</div></section>
+            {% if not client.archived %}
+                <section class="panel"><div class="panel__header"><h2>新增聯絡人</h2></div><div class="panel__body">{{ form_start(userForm) }}{{ form_widget(userForm) }}<div class="form-actions"><button class="button button--small" type="submit">建立帳號</button></div>{{ form_end(userForm) }}</div></section>
+                <section class="panel"><div class="panel__header"><h2>新增額度期間</h2></div><div class="panel__body">{{ form_start(allowanceForm) }}{{ form_widget(allowanceForm) }}<div class="form-actions"><button class="button button--small" type="submit">建立額度</button></div>{{ form_end(allowanceForm) }}</div></section>
+                <section class="panel"><div class="panel__header"><h2>建立 API 憑證</h2></div><div class="panel__body">{{ form_start(credentialForm) }}{{ form_widget(credentialForm) }}<div class="form-actions"><button class="button button--small" type="submit">產生密鑰</button></div>{{ form_end(credentialForm) }}</div></section>
+            {% endif %}
+        </aside>
+    </div>
+{% endblock %}

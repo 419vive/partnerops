@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "001-partner-operations", "codex/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-bookworm
+        env:
+          POSTGRES_DB: partnerops_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d partnerops_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      API_TOKEN_PEPPER: ci-only-partnerops-api-token-pepper
+      APP_DEBUG: "0"
+      APP_ENV: test
+      APP_SECRET: ci-only-partnerops-app-secret
+      APP_TIMEZONE: Asia/Taipei
+      # Doctrine's test config appends _test, resolving this base name to the
+      # service-created partnerops_test database.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/partnerops?serverVersion=16&charset=utf8
+      DEFAULT_URI: http://127.0.0.1:8080
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: ctype, iconv, intl, mbstring, opcache, pdo_pgsql
+          coverage: none
+          tools: composer:2.8
+
+      - name: Validate and audit Composer dependencies
+        run: |
+          composer validate --strict --no-check-publish
+          composer audit --locked --no-interaction
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Apply and validate database migrations
+        run: |
+          php bin/console doctrine:migrations:migrate --env=test --no-interaction
+          php bin/console doctrine:migrations:up-to-date --env=test
+          php bin/console doctrine:schema:validate --env=test
+
+      - name: Verify migration-only database invariants
+        run: php scripts/verify-migration-invariants.php
+
+      - name: Lint service container and templates
+        run: |
+          php bin/console lint:container --env=test
+          php bin/console lint:yaml config --parse-tags
+          php bin/console lint:twig templates
+
+      - name: Run static analysis
+        run: composer analyse
+
+      - name: Run backend test suite
+        run: php bin/phpunit
+
+      - name: Compile production assets
+        run: php bin/console asset-map:compile --env=prod --no-debug
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install and audit accessibility tooling
+        run: |
+          npm ci
+          npm audit --audit-level=high
+
+      - name: Validate OpenAPI contract
+        run: npm run api:lint
+
+      - name: Load deterministic accessibility data
+        run: |
+          php bin/console doctrine:database:drop --env=test --force --if-exists
+          php bin/console doctrine:database:create --env=test
+          php bin/console doctrine:migrations:migrate --env=test --no-interaction
+          php bin/console doctrine:fixtures:load --env=test --group=AppFixtures --append --no-interaction
+
+      - name: Start test web server
+        run: |
+          php -S 127.0.0.1:8080 -t public public/router.php >/tmp/partnerops-http.log 2>&1 &
+          for attempt in {1..20}; do
+            curl --fail --silent http://127.0.0.1:8080/health/live >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/partnerops-http.log
+          exit 1
+
+      - name: Run axe accessibility smoke test
+        run: npm run a11y
+
+      - name: Build production container
+        run: docker build --target production --tag partnerops:ci .
+
+      - name: Smoke-test production container
+        run: |
+          docker run --detach --name partnerops-ci-runtime --publish 8081:8080 \
+            --env APP_SECRET=ci-runtime-only-secret \
+            --env API_TOKEN_PEPPER=ci-runtime-only-pepper \
+            --env 'DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/partnerops_test?serverVersion=16&charset=utf8' \
+            --env DEFAULT_URI=http://127.0.0.1:8081 \
+            partnerops:ci
+          for attempt in {1..20}; do
+            if curl --fail --silent http://127.0.0.1:8081/health/live >/dev/null; then
+              docker rm --force partnerops-ci-runtime
+              exit 0
+            fi
+            if [[ "$(docker inspect --format '{{.State.Running}}' partnerops-ci-runtime)" != "true" ]]; then
+              break
+            fi
+            sleep 1
+          done
+          docker logs partnerops-ci-runtime
+          docker rm --force partnerops-ci-runtime
+          exit 1
+
+      - name: Show web server log on failure
+        if: failure()
+        run: test ! -f /tmp/partnerops-http.log || cat /tmp/partnerops-http.log

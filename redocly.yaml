@@ -1,0 +1,7 @@
+extends:
+  - recommended
+
+rules:
+  # Health probes intentionally have no caller-controlled input and therefore
+  # no meaningful application-level 4xx response.
+  operation-4xx-response: off

@@ -1,0 +1,48 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}登入 · {{ app_name }}{% endblock %}
+
+{% block public_body %}
+    <section class="auth-stage" aria-labelledby="login-title">
+        <div class="auth-story">
+            <div class="auth-story__brand">
+                <span class="brand__mark" aria-hidden="true">P</span>
+                <span><strong>PartnerOps</strong><br><small>SERVICE COMMAND</small></span>
+            </div>
+
+            <h1>把承諾<br>變成<span>進度。</span></h1>
+
+            <p class="auth-story__note">
+                從客戶請求、SLA 到每月顧問額度，所有下一步都有負責人、期限與可追溯紀錄。
+            </p>
+        </div>
+
+        <div class="auth-card">
+            <span class="eyebrow">Secure workspace</span>
+            <h2 id="login-title">歡迎回來</h2>
+            <p>登入你的服務營運工作台。</p>
+
+            {% if error %}
+                <div class="flash flash--error" role="alert">電子郵件或密碼不正確，請再試一次。</div>
+            {% endif %}
+
+            <form method="post" action="{{ path('app_login') }}">
+                <div class="field">
+                    <label for="username">電子郵件</label>
+                    <input id="username" name="_username" type="email" value="{{ last_username }}" autocomplete="username" required autofocus>
+                </div>
+                <div class="field">
+                    <label for="password">密碼</label>
+                    <input id="password" name="_password" type="password" autocomplete="current-password" required>
+                </div>
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}">
+                <button class="button button--signal" type="submit">進入工作台 <span aria-hidden="true">→</span></button>
+            </form>
+
+            <p class="demo-hint">
+                展示帳號：<strong>admin@partnerops.test</strong><br>
+                密碼：<strong>PartnerOps!2026</strong>（僅限本機合成資料）
+            </p>
+        </div>
+    </section>
+{% endblock %}

@@ -1,0 +1,14 @@
+.git
+.github
+.agents
+.specify
+.env*
+.phpunit.cache
+node_modules
+public/assets
+specs
+var
+vendor
+
+*.log
+.DS_Store

@@ -1,0 +1,16 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}建立服務請求 · {{ app_name }}{% endblock %}
+{% block context_label %}把背景、預期結果與優先順序一次說清楚。{% endblock %}
+
+{% block body %}
+    <header class="page-heading">
+        <div><span class="eyebrow">New request</span><h1>建立<em>請求</em></h1><p>送出後會產生穩定識別碼並進入「新建」佇列。</p></div>
+        <a class="button button--secondary" href="{{ path('app_request_index') }}">返回清單</a>
+    </header>
+    <div class="form-card">
+        {{ form_start(form) }}
+        {{ form_widget(form) }}
+        {{ form_end(form) }}
+    </div>
+{% endblock %}
