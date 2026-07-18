@@ -7,6 +7,7 @@ FROM php:${PHP_VERSION}-apache-bookworm AS php-base
 # libpq bounds establishment of a fresh connection. The readiness probe
 # separately applies a transaction-local PostgreSQL statement timeout.
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public \
+    APP_RUNTIME_OPTIONS='{"disable_dotenv":true}' \
     APP_TIMEZONE=Asia/Taipei \
     COMPOSER_ALLOW_SUPERUSER=1 \
     PGCONNECT_TIMEOUT=3
@@ -28,6 +29,7 @@ RUN set -eux; \
         echo 'display_errors=Off'; \
         echo 'log_errors=On'; \
         echo 'memory_limit=256M'; \
+        echo 'variables_order=EGPCS'; \
         echo 'realpath_cache_size=4096K'; \
         echo 'realpath_cache_ttl=600'; \
         echo 'opcache.enable=1'; \
@@ -56,7 +58,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 CMD ["apache2-foreground"]
 
 
-FROM composer:2.8 AS production-vendor
+FROM composer:2.10.2 AS production-vendor
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
@@ -78,7 +80,7 @@ FROM php-base AS development
 ENV APP_DEBUG=1 \
     APP_ENV=dev
 
-COPY --from=composer:2.8 /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer:2.10.2 /usr/bin/composer /usr/local/bin/composer
 COPY . .
 
 RUN set -eux; \
