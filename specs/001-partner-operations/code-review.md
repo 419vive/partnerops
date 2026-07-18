@@ -16,12 +16,14 @@ production image, maintainability, accessibility, and specification coverage.
 | P1 | Duplicate active API credential names and concurrent allowance overlap could surface as PostgreSQL 500 responses | Added preflight validation and SQLSTATE-aware race handling |
 | P1 | A browser session remained valid after its user was deactivated or client archived | Added security-aware user equality so Symfony invalidates refreshed session tokens immediately, with HTTP regression tests |
 | P1 | CI combined an already suffixed database URL with Doctrine's `_test` suffix | Pointed CI at the base database name and verified the resolved test connection targets `partnerops_test` |
+| P1 | The initial migration called the DBAL 3 `AbstractPlatform::getName()` API, removed in DBAL 4 | Replaced string platform detection with a `PostgreSQLPlatform` type check covering the active `PostgreSQL120Platform` subclass |
 | P2 | Authentication success/failure/logout had no immutable audit evidence | Added a security event subscriber without recording submitted email, password, token, or request body |
 | P2 | Request lists and detail histories triggered N+1 queries; client admin index used roughly `1 + 3N` queries | Added fetch joins, bounded pages, bulk aggregates, and query-count tests |
 | P2 | Archived-client work polluted the global team queue and over-budget metric | Excluded archived clients only from unscoped operational views while retaining explicit history access |
 | P2 | Readiness could wait on an unbounded database call; API 500 logs lacked actionable location/trace | Added PostgreSQL statement/connect timeouts and safe file/line/stack diagnostics |
 | P2 | Fixture reload conflicted with the append-only audit trigger; SchemaTool tests did not exercise production-only constraints | Documented a rebuild-and-append demo flow and added a migration-backed CI invariant gate |
 | P2 | Reverse-proxy trust and production cookie behavior were implicit | Restricted trusted forwarded headers, forced production Secure cookies, and documented exact edge CIDR handling |
+| P2 | Generic ORM schema sync treated PostgreSQL exclusion, expression, and normalized partial indexes as drift | Added an exact expected-difference contract so the native indexes remain intact while every unrecognized schema difference fails CI |
 
 No finding was suppressed with a static-analysis baseline or ignore annotation.
 

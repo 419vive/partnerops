@@ -11,14 +11,16 @@ require dirname(__DIR__).'/vendor/autoload.php';
 /*
  * Doctrine ORM cannot represent PostgreSQL exclusion constraints or expression
  * indexes, and DBAL normalizes partial-index predicates during introspection.
- * Require the exact known difference set so every other mapping/schema drift
- * still fails the release gate.
+ * The direct API call also sees Doctrine's own migration metadata table, which
+ * its console commands normally hide. Require the exact known difference set
+ * so every other mapping/schema drift still fails the release gate.
  */
 $expectedDifferences = [
     "CREATE INDEX idx_request_open_due ON service_request (due_at, priority) WHERE status NOT IN ('closed', 'resolved')",
     'DROP INDEX excl_allowance_period_overlap',
     'DROP INDEX idx_request_open_due',
     'DROP INDEX uniq_credential_active_name',
+    'DROP TABLE doctrine_migration_versions',
 ];
 
 $environment = $_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? 'dev';
