@@ -77,7 +77,11 @@ npm ci && npm run api:lint
 
 # Accessibility smoke（在 app 已啟動時，Node.js 22+）
 npm ci
-npm run a11y
+npm run a11y:install-browser
+source "$HOME/.browser-driver-manager/.env"
+npm run a11y -- \
+  --chrome-path="$CHROME_TEST_PATH" \
+  --chromedriver-path="$CHROMEDRIVER_TEST_PATH"
 
 # Health probes
 curl --fail http://localhost:8080/health/live
@@ -86,6 +90,8 @@ curl --fail http://localhost:8080/health/ready
 # Cleanup local synthetic data
 docker compose down --volumes
 ```
+
+`composer test` 與 `composer verify` 會先重建隔離的測試資料庫；安全檢查只允許 PostgreSQL `_test` 後綴，或專案 `var/` 內檔名含 `_test` 的 SQLite，拒絕刪除其他目標。
 
 CI 使用 PostgreSQL 16 service 執行 migration/schema 驗證、lint、測試與 production asset compile，最後再建置 production Docker target。axe 會掃描實際啟動的 public login page；登入後的 client isolation 與語意結構由 HTTP/DOM tests 驗證，避免把登入重導頁誤當成受保護頁面的掃描結果。
 
@@ -139,7 +145,9 @@ Production target 使用 non-root `www-data`、root-owned application code、OPc
 
 TLS/HSTS、edge rate limiting、secret rotation、備份與 migration rollout 應由部署平台處理。application container 應只接受受控 edge 的私有網路流量；edge 必須移除外部傳入值後重寫 `X-Forwarded-For`、`X-Forwarded-Proto` 與 `X-Forwarded-Port`。例如 edge 位於 `10.20.0.0/24` 時設定 `SYMFONY_TRUSTED_PROXIES=10.20.0.0/24`；不要使用 `0.0.0.0/0`、所有 private ranges 或未受控的 `REMOTE_ADDR`。正式環境 session cookie 無條件標記 `Secure`，未列入信任的來源所送 forwarded headers 不會影響 client IP 或 scheme 判斷。
 
-Production image 已將 libpq `PGCONNECT_TIMEOUT` 預設為 3 秒；若不用此 image 部署，必須在 PHP/Apache 的實際 process environment 設定等效上限（只寫在未匯出至 process 的 dotenv 檔不保證 libpq 會讀取）。每次 release 先以一次性 job 明確執行 `php bin/console doctrine:migrations:migrate --no-interaction`，成功後再切換 application traffic；production container 本身不會修改 schema。
+排程平台應以 singleton job 每小時執行 `php bin/console app:idempotency:prune --env=prod --no-interaction`，不要讓多個 cleanup workers 同時競爭同一批資料。指令預設每批 1,000 筆、每次最多 100 批並逐批提交，避免 24 小時 replay records 無限累積或以單一大型交易長時間鎖表；若積壓較大，可在監控資料庫負載下調整 `--batch-size` 與 `--max-batches`。
+
+Production image 已將 libpq `PGCONNECT_TIMEOUT` 預設為 3 秒；若不用此 image 部署，必須在 PHP/Apache 的實際 process environment 設定等效上限（只寫在未匯出至 process 的 dotenv 檔不保證 libpq 會讀取）。首次套用 `Version20260718000100` 前，先在低流量時段重複執行 prune 到沒有積壓；該 migration 會取得 `idempotency_record` 的 exclusive lock 並單次重寫 24 小時內的 bounded rows。每次 release 先以一次性 job 明確執行 `php bin/console doctrine:migrations:migrate --no-interaction`，成功後再切換 application traffic；production container 本身不會修改 schema。
 
 ## Scope
 

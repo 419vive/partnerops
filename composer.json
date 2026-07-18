@@ -68,7 +68,14 @@
         "post-update-cmd": [
             "@auto-scripts"
         ],
-        "test": "@php bin/phpunit",
+        "test:reset-database": [
+            "@php bin/console cache:clear --env=test --no-debug",
+            "@php scripts/reset-test-database.php"
+        ],
+        "test": [
+            "@test:reset-database",
+            "@php bin/phpunit"
+        ],
         "analyse": "@php vendor/bin/phpstan analyse --memory-limit=512M",
         "lint": [
             "@php bin/console lint:container",

@@ -69,6 +69,72 @@ try {
         throw new RuntimeException('The immutable audit trigger is missing or disabled.');
     }
 
+    $idempotencyResponseType = $connection->fetchOne(<<<'SQL'
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'idempotency_record'
+          AND column_name = 'response_body'
+        SQL);
+    if ($idempotencyResponseType !== 'json') {
+        throw new RuntimeException('The idempotency response column must preserve JSON object key order.');
+    }
+
+    $upgradedResponse = $connection->fetchOne(<<<'SQL'
+        SELECT response_body::text
+        FROM idempotency_record
+        WHERE idempotency_key = 'ci-upgrade-order-check'
+        SQL);
+    if (!is_string($upgradedResponse)) {
+        throw new RuntimeException('The idempotency upgrade fixture is missing.');
+    }
+    $upgradedResponse = json_decode($upgradedResponse, true, flags: JSON_THROW_ON_ERROR);
+    $expectedResponseKeys = [
+        'id',
+        'title',
+        'description',
+        'priority',
+        'status',
+        'dueAt',
+        'assignee',
+        'createdAt',
+        'updatedAt',
+        'comments',
+        'commentsPagination',
+    ];
+    if (!is_array($upgradedResponse) || array_keys($upgradedResponse) !== $expectedResponseKeys) {
+        throw new RuntimeException('The upgraded idempotency response does not preserve presenter key order.');
+    }
+    $responseId = $upgradedResponse['id'] ?? null;
+    if (!is_string($responseId) || !preg_match('/^[0-9A-HJKMNP-TV-Z]{26}$/', $responseId)) {
+        throw new RuntimeException('The upgraded idempotency response lost its request identifier.');
+    }
+    $expectedUpgradedResponse = [
+        'id' => $responseId,
+        'title' => 'CI upgrade request',
+        'description' => 'Validates response replay across a schema upgrade.',
+        'priority' => 'high',
+        'status' => 'new',
+        'dueAt' => null,
+        'assignee' => null,
+        'createdAt' => '2026-07-18T00:00:00Z',
+        'updatedAt' => '2026-07-18T00:00:00Z',
+        'comments' => [],
+        'commentsPagination' => [
+            'page' => 1,
+            'perPage' => 50,
+            'total' => 0,
+            'pages' => 1,
+        ],
+    ];
+    if ($upgradedResponse !== $expectedUpgradedResponse) {
+        throw new RuntimeException('The idempotency upgrade changed cached response values.');
+    }
+    $pagination = $upgradedResponse['commentsPagination'] ?? null;
+    if (!is_array($pagination) || array_keys($pagination) !== ['page', 'perPage', 'total', 'pages']) {
+        throw new RuntimeException('The upgraded pagination response does not preserve presenter key order.');
+    }
+
     $clientId = (int) $connection->fetchOne(<<<'SQL'
         INSERT INTO client
             (public_id, name, slug, is_archived, archived_at, created_at, updated_at)

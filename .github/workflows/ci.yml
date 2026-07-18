@@ -65,6 +65,8 @@ jobs:
 
       - name: Apply and validate database migrations
         run: |
+          php bin/console doctrine:migrations:migrate 'DoctrineMigrations\Version20260718000000' --env=test --no-interaction
+          php scripts/prepare-idempotency-upgrade-fixture.php
           php bin/console doctrine:migrations:migrate --env=test --no-interaction
           php bin/console doctrine:migrations:up-to-date --env=test
           php bin/console doctrine:schema:validate --env=test --skip-sync
@@ -72,6 +74,17 @@ jobs:
 
       - name: Verify migration-only database invariants
         run: php scripts/verify-migration-invariants.php
+
+      - name: Verify the published JSON predecessor upgrade
+        run: |
+          php scripts/reset-test-database.php
+          php bin/console doctrine:migrations:migrate 'DoctrineMigrations\Version20260718000000' --env=test --no-interaction
+          php scripts/simulate-published-json-predecessor.php
+          IDEMPOTENCY_PREDECESSOR_TYPE=json php scripts/prepare-idempotency-upgrade-fixture.php
+          php bin/console doctrine:migrations:migrate --env=test --no-interaction
+          php bin/console doctrine:migrations:up-to-date --env=test
+          php scripts/verify-schema-contract.php
+          php scripts/verify-migration-invariants.php
 
       - name: Lint service container and templates
         run: |
@@ -83,10 +96,7 @@ jobs:
         run: composer analyse
 
       - name: Run backend test suite
-        run: |
-          php bin/console doctrine:database:drop --env=test --force --if-exists
-          php bin/console doctrine:database:create --env=test
-          php bin/phpunit
+        run: composer test
 
       - name: Compile production assets
         run: php bin/console asset-map:compile --env=prod --no-debug
@@ -107,8 +117,7 @@ jobs:
 
       - name: Load deterministic accessibility data
         run: |
-          php bin/console doctrine:database:drop --env=test --force --if-exists
-          php bin/console doctrine:database:create --env=test
+          php scripts/reset-test-database.php
           php bin/console doctrine:migrations:migrate --env=test --no-interaction
           php bin/console doctrine:fixtures:load --env=test --group=AppFixtures --append --no-interaction
 
@@ -123,7 +132,12 @@ jobs:
           exit 1
 
       - name: Run axe accessibility smoke test
-        run: npm run a11y
+        run: |
+          npm run a11y:install-browser
+          source "$HOME/.browser-driver-manager/.env"
+          npm run a11y -- \
+            --chrome-path="$CHROME_TEST_PATH" \
+            --chromedriver-path="$CHROMEDRIVER_TEST_PATH"
 
       - name: Build production container
         run: docker build --target production --tag partnerops:ci .

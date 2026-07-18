@@ -7,6 +7,8 @@ namespace App\Repository;
 use App\Entity\ApiCredential;
 use App\Entity\IdempotencyRecord;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ParameterType;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
 
 /** @extends ServiceEntityRepository<IdempotencyRecord> */
@@ -30,10 +32,32 @@ final class IdempotencyRecordRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-    public function deleteExpired(\DateTimeImmutable $now): int
+    public function deleteExpired(\DateTimeImmutable $now, int $batchSize = 1000): int
     {
-        return $this->getEntityManager()->createQuery(
-            'DELETE FROM App\Entity\IdempotencyRecord i WHERE i.expiresAt <= :now',
-        )->setParameter('now', $now)->execute();
+        if ($batchSize < 1 || $batchSize > 10000) {
+            throw new \InvalidArgumentException('Idempotency cleanup batch size must be between 1 and 10000.');
+        }
+
+        $deleted = $this->getEntityManager()->getConnection()->executeStatement(<<<'SQL'
+            DELETE FROM idempotency_record
+            WHERE id IN (
+                SELECT id
+                FROM idempotency_record
+                WHERE expires_at <= :now
+                ORDER BY expires_at ASC, id ASC
+                LIMIT :batch_size
+            )
+            SQL, [
+            'now' => $now,
+            'batch_size' => $batchSize,
+        ], [
+            'now' => Types::DATETIME_IMMUTABLE,
+            'batch_size' => ParameterType::INTEGER,
+        ]);
+        if (!is_int($deleted)) {
+            throw new \RuntimeException('The database returned an invalid idempotency cleanup count.');
+        }
+
+        return $deleted;
     }
 }

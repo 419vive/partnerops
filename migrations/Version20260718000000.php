@@ -258,7 +258,7 @@ final class Version20260718000000 extends AbstractMigration
                 request_fingerprint CHAR(64) NOT NULL,
                 service_request_id BIGINT NOT NULL,
                 response_status SMALLINT NOT NULL,
-                response_body JSON NOT NULL,
+                response_body JSONB NOT NULL,
                 created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
                 expires_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
                 PRIMARY KEY(id),
@@ -267,7 +267,7 @@ final class Version20260718000000 extends AbstractMigration
                 CONSTRAINT chk_idempotency_key CHECK (idempotency_key ~ '^[!-~]+$'),
                 CONSTRAINT chk_idempotency_fingerprint CHECK (request_fingerprint ~ '^[a-f0-9]{64}$'),
                 CONSTRAINT chk_idempotency_status CHECK (response_status = 201),
-                CONSTRAINT chk_idempotency_response CHECK (json_typeof(response_body) = 'object'),
+                CONSTRAINT chk_idempotency_response CHECK (jsonb_typeof(response_body) = 'object'),
                 CONSTRAINT chk_idempotency_expiry CHECK (expires_at > created_at)
             )
             SQL);

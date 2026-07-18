@@ -51,7 +51,7 @@ class AuditEvent
     private ?string $subjectPublicId;
 
     /** @var array<string, bool|float|int|string|null> */
-    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true], updatable: false)]
+    #[ORM\Column(type: Types::JSONB, updatable: false)]
     private array $metadata;
 
     #[ORM\Column(length: 64, updatable: false)]

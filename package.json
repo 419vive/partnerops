@@ -4,12 +4,14 @@
   "private": true,
   "description": "Development-only quality tooling for the PartnerOps Symfony application",
   "scripts": {
+    "a11y:install-browser": "browser-driver-manager install chrome",
     "a11y": "axe --chrome-options=\"no-sandbox,disable-dev-shm-usage\" http://127.0.0.1:8080/login --tags wcag2a,wcag2aa,wcag21a,wcag21aa --exit",
     "api:lint": "redocly lint specs/001-partner-operations/contracts/openapi.yaml"
   },
   "devDependencies": {
     "@axe-core/cli": "4.12.1",
-    "@redocly/cli": "2.39.0"
+    "@redocly/cli": "2.39.0",
+    "browser-driver-manager": "2.0.1"
   },
   "overrides": {
     "adm-zip": "0.6.0"

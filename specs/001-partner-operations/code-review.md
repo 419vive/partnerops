@@ -18,6 +18,7 @@ production image, maintainability, accessibility, and specification coverage.
 | P1 | CI combined an already suffixed database URL with Doctrine's `_test` suffix | Pointed CI at the base database name and verified the resolved test connection targets `partnerops_test` |
 | P1 | The initial migration called the DBAL 3 `AbstractPlatform::getName()` API, removed in DBAL 4 | Replaced string platform detection with a `PostgreSQLPlatform` type check covering the active `PostgreSQL120Platform` subclass |
 | P1 | PostgreSQL `jsonb` reordered cached response keys, violating byte-identical idempotency replay | Store the validated response document as PostgreSQL `json`, which preserves key order while retaining database JSON validation |
+| P1 | Rewriting the published initial migration would leave different databases on `jsonb` or the briefly published `json` predecessor | Restored the original migration and added a single-rewrite forward migration that repairs active replay key order; CI covers both predecessor histories, exact fixture values, and low-traffic rollout guidance |
 | P1 | Migration-gate objects leaked into SchemaTool-based tests and left a circularly referenced table behind | Recreate the disposable test database between migration verification and the isolated ORM test suite |
 | P2 | Authentication success/failure/logout had no immutable audit evidence | Added a security event subscriber without recording submitted email, password, token, or request body |
 | P2 | Request lists and detail histories triggered N+1 queries; client admin index used roughly `1 + 3N` queries | Added fetch joins, bounded pages, bulk aggregates, and query-count tests |
@@ -27,12 +28,16 @@ production image, maintainability, accessibility, and specification coverage.
 | P2 | Reverse-proxy trust and production cookie behavior were implicit | Restricted trusted forwarded headers, forced production Secure cookies, and documented exact edge CIDR handling |
 | P2 | Generic ORM schema sync treated PostgreSQL exclusion, expression, and normalized partial indexes as drift | Added an exact expected-difference contract so the native indexes remain intact while every unrecognized schema difference fails CI |
 | P2 | Query-count regressions were only measurable when the test kernel happened to run with debug enabled | Enable DBAL profiling explicitly in test and expose its data holder through a test-only typed service alias |
+| P2 | `composer verify` did not reproduce CI's test environment or disposable database lifecycle | Test bootstrap now pins the process to `APP_ENV=test`; a shared reset command refuses non-test targets and supports both local SQLite and PostgreSQL CI databases |
+| P2 | Expired 24-hour idempotency records had no operational cleanup path | Added a bounded batch prune command, regression test, and hourly production scheduling guidance |
+| P2 | The runner's preinstalled Chrome lagged the lockfile's ChromeDriver and prevented axe from starting | Install a locked browser manager and pass synchronized Chrome-for-Testing binary paths explicitly to axe |
+| P3 | DBAL/Symfony emitted forward-compatibility deprecations for JSONB mapping, user checker, and voter signatures | Adopted DBAL's JSONB type and the optional Symfony 8 method parameters without changing current behavior |
 
 No finding was suppressed with a static-analysis baseline or ignore annotation.
 
 ## Local quality gates
 
-- PHPUnit: 38 tests, 561 assertions
+- PHPUnit: 39 tests, 572 assertions
 - PHPStan: level 8, zero errors
 - Symfony container, YAML, and Twig lint: pass
 - Composer validation and locked dependency audit: pass
