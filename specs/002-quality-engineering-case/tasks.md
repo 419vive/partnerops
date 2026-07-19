@@ -90,8 +90,8 @@ description: "Dependency-ordered implementation tasks for the PartnerOps Release
 - [x] T010 [P] [US4] Write risk scope, environments, test data, entry/exit criteria, traceability matrix, and explicit exclusions in `docs/quality/test-plan.md`
 - [x] T011 [P] [US4] Document the verified PostgreSQL `jsonb` idempotency replay impact, reproduction, root cause, fix commits, migration concern, and regression evidence in `docs/quality/defects/BUG-001-idempotency-replay.md`
 - [x] T012 [P] [US4] Add required severity, environment, steps, expected/actual, evidence, and regression fields plus secret warnings in `.github/ISSUE_TEMPLATE/defect.yml`
-- [ ] T013 [US4] Record freshly executed local and public results, limitations, known risks, evidence links, and Go/No-Go decision in `docs/quality/test-report.md`
-- [ ] T014 [US4] Add a concise Release Confidence Lab section linking the plan, test plan, report, defect, commands, and public Actions evidence in `README.md`
+- [x] T013 [US4] Record freshly executed local and public results, limitations, known risks, evidence links, and Go/No-Go decision in `docs/quality/test-report.md`
+- [x] T014 [US4] Add a concise Release Confidence Lab section linking the plan, test plan, report, defect, commands, and public Actions evidence in `README.md`
 
 **Checkpoint**: User Story 4 is independently reviewable and contains no invented metric, experience, tool, or discovery claim.
 
@@ -102,10 +102,10 @@ description: "Dependency-ordered implementation tasks for the PartnerOps Release
 **Purpose**: Correct prior documentation, verify the complete repository, publish public evidence, and close the Spec Kit record.
 
 - [x] T015 Correct the overbroad authenticated-page/two-viewport axe statement and link the new black-box guide in `specs/001-partner-operations/quickstart.md`
-- [ ] T016 Run the backend gate, Playwright projects, sequential benchmark, k6 profile, OpenAPI lint, axe login smoke, and container build from `specs/002-quality-engineering-case/quickstart.md` in a reproducible Linux workflow, then update only observed results in `docs/quality/test-report.md`
+- [x] T016 Run the backend gate, Playwright projects, sequential benchmark, k6 profile, OpenAPI lint, axe login smoke, and container build from `specs/002-quality-engineering-case/quickstart.md` in a reproducible Linux workflow, then update only observed results in `docs/quality/test-report.md`
 - [x] T017 Validate task format, requirement traceability, Markdown links, generated-output ignores, synthetic-data boundaries, credential/log redaction, and whitespace with `specs/002-quality-engineering-case/tasks.md`
-- [ ] T018 Push `codex/002-quality-engineering-case`, run public quality and performance workflows, and add their exact URLs/results to `docs/quality/test-report.md` without describing shared-runner evidence as production capacity
-- [ ] T019 Re-run the final commit's required GitHub Actions, set the implemented status, and mark completed checklist items in `specs/002-quality-engineering-case/spec.md` and `specs/002-quality-engineering-case/tasks.md`
+- [x] T018 Push `codex/002-quality-engineering-case`, run public quality and performance workflows, and add their exact URLs/results to `docs/quality/test-report.md` without describing shared-runner evidence as production capacity
+- [x] T019 Re-run the final commit's required GitHub Actions, set the implemented status, and mark completed checklist items in `specs/002-quality-engineering-case/spec.md` and `specs/002-quality-engineering-case/tasks.md`
 
 ---
 
@@ -197,4 +197,5 @@ edits, final commands, evidence wording, and publication.
 - `[US#]` maps directly to the four prioritized stories in `spec.md`.
 - Generated HTML, JUnit, trace, screenshot, video, benchmark, k6, database, and log output is never committed.
 - Mobile means responsive Web only; the case makes no Appium, native-app, game, years-of-experience, deployment, production-SLA, or full-WCAG claim.
+- T019 treats `8e3f801` as the final executable SUT/harness commit: quality run `29687395199` and performance run `29687399527` both passed that SHA. The following closeout-only documentation commit receives the normal CI gate but does not relabel its predecessor's measured performance as a new run.
 - Commit after each verified logical group; do not mark a task complete from agent reports alone.

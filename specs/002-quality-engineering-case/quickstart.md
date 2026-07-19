@@ -80,17 +80,28 @@ thresholds pass. This is a local Docker baseline, not production capacity.
 
 ## 5. Run the public performance workflow
 
-After `.github/workflows/performance.yml` has been merged into the default
-branch (GitHub only dispatches workflows that exist there):
+The workflow now exists on the default branch. Trigger it for the branch or tag
+under review (GitHub requires the workflow definition itself to remain on the
+default branch), then verify the resulting run's exact commit before citing it:
 
 ```bash
-gh workflow run performance.yml --ref main
-gh run list --workflow performance.yml --limit 1
+SELECTED_REF=your-branch-or-tag
+EXPECTED_SHA=$(git rev-parse "$SELECTED_REF^{commit}")
+gh workflow run performance.yml --ref "$SELECTED_REF"
+gh run list --workflow performance.yml --branch "$SELECTED_REF" \
+  --event workflow_dispatch --limit 10 \
+  --json databaseId,headSha,url,createdAt,status,conclusion
+printf 'Expected headSha: %s\n' "$EXPECTED_SHA"
 ```
 
-Expected outcome: the selected commit builds its production container, loads
-10,000 synthetic requests, executes both profiles, and uploads benchmark text,
-k6 JSON, and failure logs as a 30-day artifact.
+Choose the newly created row whose `headSha` equals `EXPECTED_SHA`; do not infer
+identity from `--limit 1` alone. A successful run builds that commit's production
+container, loads 10,000 synthetic requests, executes both profiles, and uploads
+run context, benchmark text, and k6 JSON as a 30-day artifact. `application.log`
+is failure-only, and an early failure may omit downstream benchmark or k6 files.
+The verified reference execution is
+[run 29687399527](https://github.com/419vive/partnerops/actions/runs/29687399527);
+use the report rather than an expiring artifact URL for durable evidence.
 
 ## 6. Validate the complete repository gate
 

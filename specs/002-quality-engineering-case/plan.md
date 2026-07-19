@@ -113,6 +113,24 @@ human-readable evidence under `docs/quality`. One root Playwright config and the
 existing package lock provide the whole JavaScript harness. GitHub-native workflow,
 artifact, and issue-form capabilities cover automation and reporting.
 
+### Post-implementation deviation
+
+The original structure intentionally started without product changes. Public
+black-box execution then exposed two release-blocking defects, so the implemented
+scope includes only their focused corrections:
+
+- `44025f1` preserves empty audit metadata as a JSON object so browser login does
+  not violate the PostgreSQL object constraint.
+- `b213309` removes an implicit grid-column minimum that expanded the configured
+  320 px responsive document to 514 px and narrows an ambiguous semantic locator.
+
+Runtime performance execution also showed that non-browser clients must provide
+same-origin evidence for the existing stateless CSRF policy and must not assume
+the public login GET creates a session. Commits `22356c3`, `9cc4eba`, and
+`8e3f801` correct the test clients and add bounded diagnostics without weakening
+CSRF, Secure cookies, thresholds, or the production image. No runtime service or
+new schema was added.
+
 ## Complexity Tracking
 
 No constitution violations or added runtime infrastructure require justification.

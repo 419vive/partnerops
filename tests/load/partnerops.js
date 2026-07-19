@@ -51,8 +51,12 @@ function login() {
   }
 
   const anonymousCookie = responseCookies(loginPage);
-  if (!anonymousCookie) {
-    fail('Login setup did not establish a synthetic session.');
+  const loginHeaders = {
+    // k6 is not a browser and does not synthesize Sec-Fetch-Site.
+    Referer: `${baseUrl}/login`,
+  };
+  if (anonymousCookie) {
+    loginHeaders.Cookie = anonymousCookie;
   }
 
   const login = http.post(`${baseUrl}/login`, {
@@ -61,14 +65,22 @@ function login() {
     _csrf_token: csrfMatch[1],
   }, {
     redirects: 0,
-    headers: { Cookie: anonymousCookie },
+    headers: loginHeaders,
     tags: { route: 'login_setup' },
   });
-  if (login.status !== 302) {
-    fail(`Synthetic login returned HTTP ${login.status}.`);
+  const loginLocation = login.headers.Location || login.headers.location || '';
+  const expectedAbsoluteLocation = `${baseUrl}/`;
+  if (login.status !== 302 || (loginLocation !== '/' && loginLocation !== expectedAbsoluteLocation)) {
+    const safeLocation = loginLocation.startsWith('/') && !loginLocation.startsWith('//')
+      ? loginLocation.split(/[?#]/, 1)[0]
+      : '[external-or-missing]';
+    fail(`Synthetic login returned HTTP ${login.status} with Location ${safeLocation}.`);
   }
 
   const authenticatedCookie = responseCookies(login) || anonymousCookie;
+  if (!authenticatedCookie) {
+    fail('Synthetic login did not establish an authenticated session.');
+  }
 
   return authenticatedCookie;
 }
