@@ -126,9 +126,9 @@ jobs:
 
       - name: Start test web server
         run: |
-          php -S 127.0.0.1:8080 -t public public/router.php >/tmp/partnerops-http.log 2>&1 &
+          php -d variables_order=EGPCS -S 127.0.0.1:8080 -t public public/router.php >/tmp/partnerops-http.log 2>&1 &
           for attempt in {1..20}; do
-            curl --fail --silent http://127.0.0.1:8080/health/live >/dev/null && exit 0
+            curl --fail --silent http://127.0.0.1:8080/health/ready >/dev/null && exit 0
             sleep 1
           done
           cat /tmp/partnerops-http.log
