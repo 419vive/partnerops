@@ -6,6 +6,7 @@ base_url="${base_url%/}"
 samples="${BENCH_SAMPLES:-30}"
 threshold_ms="${BENCH_THRESHOLD_MS:-750}"
 login_path="${BENCH_LOGIN_PATH:-/login}"
+login_success_path="${BENCH_LOGIN_SUCCESS_PATH:-/}"
 dashboard_path="${BENCH_DASHBOARD_PATH:-/}"
 queue_path="${BENCH_QUEUE_PATH:-/requests?status=in_progress&page=1}"
 email="${BENCH_EMAIL:-agent@partnerops.test}"
@@ -18,6 +19,11 @@ case "$samples" in
 esac
 case "$threshold_ms" in
     ''|*[!0-9]*|0) echo "BENCH_THRESHOLD_MS must be a positive integer" >&2; exit 2 ;;
+esac
+case "$login_success_path" in
+    //*|'') echo "BENCH_LOGIN_SUCCESS_PATH must be a local absolute path" >&2; exit 2 ;;
+    /*) ;;
+    *) echo "BENCH_LOGIN_SUCCESS_PATH must be a local absolute path" >&2; exit 2 ;;
 esac
 
 for command in curl awk sed sort mktemp uname; do
@@ -46,6 +52,35 @@ fi
 
 session_cookie_before="$(awk '$6 == "partnerops_session" { print $7; exit }' "$cookie_jar")"
 
+safe_local_path() {
+    raw_value="$1"
+    case "$raw_value" in
+        '')
+            printf '%s\n' 'none'
+            ;;
+        "$base_url")
+            printf '%s\n' '/'
+            ;;
+        "$base_url"/*)
+            local_path="${raw_value#"$base_url"}"
+            local_path="${local_path%%\?*}"
+            local_path="${local_path%%#*}"
+            printf '%s\n' "${local_path:-/}"
+            ;;
+        //*)
+            printf '%s\n' '[external]'
+            ;;
+        /*)
+            local_path="${raw_value%%\?*}"
+            local_path="${local_path%%#*}"
+            printf '%s\n' "${local_path:-/}"
+            ;;
+        *)
+            printf '%s\n' '[external]'
+            ;;
+    esac
+}
+
 # Curl does not synthesize browser Fetch Metadata; the stateless CSRF manager
 # therefore needs explicit same-origin evidence for the login form POST.
 set +e
@@ -67,14 +102,11 @@ if [ "$login_curl_status" -ne 0 ]; then
     exit 1
 fi
 login_post_status="$(awk '/^HTTP\// { print $2; exit }' "$login_headers")"
-login_location="$(awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$login_headers")"
-login_location="${login_location%%\?*}"
-login_location="${login_location%%#*}"
+login_location_raw="$(awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); print; exit }' "$login_headers")"
+login_location="$(safe_local_path "$login_location_raw")"
 login_final_status="$(printf '%s\n' "$login_result" | sed -n '1p')"
 effective_url="$(printf '%s\n' "$login_result" | sed -n '2p')"
-effective_path="${effective_url#"$base_url"}"
-effective_path="${effective_path%%\?*}"
-effective_path="${effective_path%%#*}"
+effective_path="$(safe_local_path "$effective_url")"
 session_cookie_after="$(awk '$6 == "partnerops_session" { print $7; exit }' "$cookie_jar")"
 
 session_cookie_initial=absent
@@ -98,13 +130,14 @@ if [ "$login_post_status" != "302" ]; then
     echo "Login POST returned unexpected HTTP ${login_post_status:-unknown}" >&2
     exit 1
 fi
-
-case "$effective_path" in
-    "$login_path")
-        echo "Login did not leave $login_path; verify BENCH_* credentials and field names" >&2
-        exit 1
-        ;;
-esac
+if [ "$login_location" != "$login_success_path" ]; then
+    echo "Login POST did not redirect to $login_success_path; verify BENCH_* credentials and request headers" >&2
+    exit 1
+fi
+if [ "$effective_path" != "$login_success_path" ]; then
+    echo "Login did not finish at $login_success_path; verify authenticated session handling" >&2
+    exit 1
+fi
 
 measure() {
     label="$1"

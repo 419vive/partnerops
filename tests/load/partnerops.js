@@ -68,8 +68,13 @@ function login() {
     },
     tags: { route: 'login_setup' },
   });
-  if (login.status !== 302) {
-    fail(`Synthetic login returned HTTP ${login.status}.`);
+  const loginLocation = login.headers.Location || login.headers.location || '';
+  const expectedAbsoluteLocation = `${baseUrl}/`;
+  if (login.status !== 302 || (loginLocation !== '/' && loginLocation !== expectedAbsoluteLocation)) {
+    const safeLocation = loginLocation.startsWith('/') && !loginLocation.startsWith('//')
+      ? loginLocation.split(/[?#]/, 1)[0]
+      : '[external-or-missing]';
+    fail(`Synthetic login returned HTTP ${login.status} with Location ${safeLocation}.`);
   }
 
   const authenticatedCookie = responseCookies(login) || anonymousCookie;
