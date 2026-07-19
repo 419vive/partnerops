@@ -19,7 +19,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-bookworm
+        image: postgres:16-bookworm@sha256:92620daddcd947f8d5ab5ba66e848702fe443d87fed30c4cea8e389fd78dfc55
         env:
           POSTGRES_DB: partnerops_test
           POSTGRES_PASSWORD: postgres
@@ -45,10 +45,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up PHP 8.4
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: "8.4"
           extensions: ctype, iconv, intl, mbstring, opcache, pdo_pgsql
@@ -102,7 +104,7 @@ jobs:
         run: php bin/console asset-map:compile --env=prod --no-debug
 
       - name: Set up Node.js 22
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           cache: npm
@@ -120,6 +122,7 @@ jobs:
           php scripts/reset-test-database.php
           php bin/console doctrine:migrations:migrate --env=test --no-interaction
           php bin/console doctrine:fixtures:load --env=test --group=AppFixtures --append --no-interaction
+          php bin/console cache:pool:clear cache.rate_limiter --env=test
 
       - name: Start test web server
         run: |
@@ -163,6 +166,23 @@ jobs:
           docker logs partnerops-ci-runtime
           docker rm --force partnerops-ci-runtime
           exit 1
+
+      - name: Install locked Playwright Chromium
+        run: npm run test:e2e:install
+
+      - name: Run Playwright black-box suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Show web server log on failure
         if: failure()

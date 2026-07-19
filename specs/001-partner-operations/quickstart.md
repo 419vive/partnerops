@@ -4,6 +4,9 @@ This guide proves the specification end to end. It intentionally references the
 [data model](./data-model.md) and [OpenAPI contract](./contracts/openapi.yaml)
 instead of duplicating implementation details.
 
+For the external Playwright browser/API gate and manual load profile, follow the
+[Release Confidence Lab quickstart](../002-quality-engineering-case/quickstart.md).
+
 ## Prerequisites
 
 Recommended path:
@@ -140,8 +143,10 @@ docker compose build app
 
 `composer verify` is the single backend gate and runs Composer validation/audit,
 Symfony container/config/Twig/YAML lint, database migration/schema checks, and the
-unit/integration/functional suite. The accessibility command scans seeded login,
-team, and client pages at narrow and desktop widths.
+unit/integration/functional suite. The current axe command scans only the public
+login page at its default viewport. It does not establish authenticated-page or
+multi-viewport WCAG coverage; the feature 002 mobile Playwright scenario checks
+responsive operability and overflow, not WCAG conformance.
 
 Expected outcome: every command exits zero and the working tree remains unchanged.
 

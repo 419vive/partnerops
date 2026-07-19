@@ -16,6 +16,29 @@ PartnerOps 是一個可部署、可稽核的 Symfony 後端作品：顧問團隊
 
 完整行為規格請見 [feature spec](specs/001-partner-operations/spec.md)，HTTP 介面以 [OpenAPI 3.1 contract](specs/001-partner-operations/contracts/openapi.yaml) 為準。
 
+## 品質工程案例 / Release Confidence Lab
+
+PartnerOps 另有一套從真實商業風險出發的黑箱發布驗證：Playwright
+覆蓋桌面關鍵流程、320px 響應式 Web、跨客戶隔離與 API idempotency；
+手動 performance workflow 則以 10,000 筆合成資料執行既有 sequential
+benchmark 與 k6 concurrent load。所有結果都區分本機／GitHub runner，
+不包裝成 production SLA。
+
+- [實作規格與決策](specs/002-quality-engineering-case/plan.md)
+- [測試計畫與需求追溯](docs/quality/test-plan.md)
+- [執行報告與 Go/No-Go](docs/quality/test-report.md)
+- [真實缺陷案例：PostgreSQL replay key order](docs/quality/defects/BUG-001-idempotency-replay.md)
+- [CI workflow](.github/workflows/ci.yml) · [手動效能 workflow](.github/workflows/performance.yml)
+
+```bash
+npm ci
+npm run test:e2e:install
+npm run test:e2e
+```
+
+完整的環境重建、單一 project 診斷與 performance 指令請見
+[quality quickstart](specs/002-quality-engineering-case/quickstart.md)。
+
 ## 架構 / Architecture
 
 ```mermaid
