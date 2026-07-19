@@ -1,8 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG PHP_VERSION=8.4
-
-FROM php:${PHP_VERSION}-apache-bookworm AS php-base
+FROM php:8.4-apache-bookworm@sha256:dfa7fd05d77ba439adb04e085fd9eb4bbe84540f30c66efb09d225650181b5f0 AS php-base
 
 # libpq bounds establishment of a fresh connection. The readiness probe
 # separately applies a transaction-local PostgreSQL statement timeout.
@@ -58,7 +56,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 CMD ["apache2-foreground"]
 
 
-FROM composer:2.10.2 AS production-vendor
+FROM composer:2.10.2@sha256:5946476338742b200bb9ff88f8be56275ddae4b3949c72305cb0dbf10cfcb760 AS composer-base
+
+FROM composer-base AS production-vendor
 
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
@@ -80,7 +80,7 @@ FROM php-base AS development
 ENV APP_DEBUG=1 \
     APP_ENV=dev
 
-COPY --from=composer:2.10.2 /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer-base /usr/bin/composer /usr/local/bin/composer
 COPY . .
 
 RUN set -eux; \

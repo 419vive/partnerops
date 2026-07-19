@@ -3,8 +3,12 @@
 declare(strict_types=1);
 
 use App\Kernel;
+use App\Entity\AuditEvent;
+use App\Entity\User;
+use App\Enum\AuditActorType;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\DriverException;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Ulid;
 
 require dirname(__DIR__).'/vendor/autoload.php';
@@ -49,6 +53,10 @@ try {
     $connection = $container->get(Connection::class);
     if (!$connection instanceof Connection) {
         throw new RuntimeException('Doctrine DBAL connection is unavailable.');
+    }
+    $entityManager = $container->get(EntityManagerInterface::class);
+    if (!$entityManager instanceof EntityManagerInterface) {
+        throw new RuntimeException('Doctrine ORM entity manager is unavailable.');
     }
 
     $constraintType = $connection->fetchOne(<<<'SQL'
@@ -203,19 +211,30 @@ try {
         ]),
     );
 
-    $auditId = (int) $connection->fetchOne(<<<'SQL'
-        INSERT INTO audit_event
-            (public_id, client_id, actor_id, actor_type, "action", subject_type,
-             subject_public_id, metadata, trace_id, occurred_at)
-        VALUES
-            (:public_id, :client_id, :actor_id, 'user', 'ci.migration_check',
-             'database', NULL, '{}'::jsonb, 'ci-migration-check', NOW())
-        RETURNING id
-        SQL, [
-        'public_id' => migrationCheckId(),
-        'client_id' => $clientId,
-        'actor_id' => $adminId,
-    ]);
+    $admin = $entityManager->find(User::class, $adminId);
+    if (!$admin instanceof User) {
+        throw new RuntimeException('The migration-check user could not be loaded.');
+    }
+    $audit = new AuditEvent(
+        action: 'ci.migration_check',
+        subjectType: 'database',
+        traceId: 'ci-migration-check',
+        actorType: AuditActorType::User,
+        actor: $admin,
+    );
+    $entityManager->persist($audit);
+    $entityManager->flush();
+    $auditId = $audit->getId();
+    if ($auditId === null) {
+        throw new RuntimeException('The ORM-created migration audit has no identifier.');
+    }
+    $metadataType = $connection->fetchOne(
+        'SELECT jsonb_typeof(metadata) FROM audit_event WHERE id = :id',
+        ['id' => $auditId],
+    );
+    if ($metadataType !== 'object') {
+        throw new RuntimeException('An empty audit metadata map must persist as a JSON object.');
+    }
 
     expectSqlState(
         $connection,

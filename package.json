@@ -6,10 +6,13 @@
   "scripts": {
     "a11y:install-browser": "browser-driver-manager install chrome",
     "a11y": "axe --chrome-options=\"no-sandbox,disable-dev-shm-usage\" http://127.0.0.1:8080/login --tags wcag2a,wcag2aa,wcag21a,wcag21aa --exit",
-    "api:lint": "redocly lint specs/001-partner-operations/contracts/openapi.yaml"
+    "api:lint": "redocly lint specs/001-partner-operations/contracts/openapi.yaml",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
     "@axe-core/cli": "4.12.1",
+    "@playwright/test": "1.61.1",
     "@redocly/cli": "2.39.0",
     "browser-driver-manager": "2.0.1"
   },

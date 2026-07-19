@@ -19,7 +19,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-bookworm
+        image: postgres:16-bookworm@sha256:92620daddcd947f8d5ab5ba66e848702fe443d87fed30c4cea8e389fd78dfc55
         env:
           POSTGRES_DB: partnerops_test
           POSTGRES_PASSWORD: postgres
@@ -45,10 +45,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Set up PHP 8.4
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
         with:
           php-version: "8.4"
           extensions: ctype, iconv, intl, mbstring, opcache, pdo_pgsql
@@ -102,7 +104,7 @@ jobs:
         run: php bin/console asset-map:compile --env=prod --no-debug
 
       - name: Set up Node.js 22
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           cache: npm
@@ -120,12 +122,13 @@ jobs:
           php scripts/reset-test-database.php
           php bin/console doctrine:migrations:migrate --env=test --no-interaction
           php bin/console doctrine:fixtures:load --env=test --group=AppFixtures --append --no-interaction
+          php bin/console cache:pool:clear cache.rate_limiter --env=test
 
       - name: Start test web server
         run: |
-          php -S 127.0.0.1:8080 -t public public/router.php >/tmp/partnerops-http.log 2>&1 &
+          php -d variables_order=EGPCS -S 127.0.0.1:8080 -t public public/router.php >/tmp/partnerops-http.log 2>&1 &
           for attempt in {1..20}; do
-            curl --fail --silent http://127.0.0.1:8080/health/live >/dev/null && exit 0
+            curl --fail --silent http://127.0.0.1:8080/health/ready >/dev/null && exit 0
             sleep 1
           done
           cat /tmp/partnerops-http.log
@@ -164,6 +167,30 @@ jobs:
           docker rm --force partnerops-ci-runtime
           exit 1
 
-      - name: Show web server log on failure
+      - name: Install locked Playwright Chromium
+        run: npm run test:e2e:install
+
+      - name: Run Playwright black-box suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Show bounded redacted application logs on failure
         if: failure()
-        run: test ! -f /tmp/partnerops-http.log || cat /tmp/partnerops-http.log
+        run: |
+          (tail -n 300 /tmp/partnerops-http.log var/log/test.log 2>/dev/null || true) \
+            | sed -E \
+                -e 's/(Bearer )[[:alnum:]_.-]+/\1[REDACTED]/g' \
+                -e 's/ptk_[[:alnum:]_.-]+/[REDACTED_TOKEN]/g' \
+                -e 's#(postgresql://[^:/[:space:]]+):[^@[:space:]]+@#\1:[REDACTED]@#g' \
+                -e 's/PartnerOps!2026/[REDACTED_PASSWORD]/g' \
+                -e 's/ci-only-partnerops-(api-token-pepper|app-secret)/[REDACTED_VALUE]/g'

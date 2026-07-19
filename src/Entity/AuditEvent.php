@@ -50,9 +50,9 @@ class AuditEvent
     #[ORM\Column(length: 26, nullable: true, updatable: false, options: ['fixed' => true])]
     private ?string $subjectPublicId;
 
-    /** @var array<string, bool|float|int|string|null> */
+    /** @var array<string, bool|float|int|string|null>|\stdClass */
     #[ORM\Column(type: Types::JSONB, updatable: false)]
-    private array $metadata;
+    private array|\stdClass $metadata;
 
     #[ORM\Column(length: 64, updatable: false)]
     private string $traceId;
@@ -99,7 +99,7 @@ class AuditEvent
         $this->action = $action;
         $this->subjectType = $subjectType;
         $this->subjectPublicId = $subjectPublicId;
-        $this->metadata = $metadata;
+        $this->metadata = $metadata === [] ? new \stdClass() : $metadata;
         $this->traceId = $traceId;
         $this->occurredAt = $occurredAt ?? self::now();
     }
@@ -147,7 +147,7 @@ class AuditEvent
     /** @return array<string, bool|float|int|string|null> */
     public function getMetadata(): array
     {
-        return $this->metadata;
+        return $this->metadata instanceof \stdClass ? [] : $this->metadata;
     }
 
     public function getTraceId(): string

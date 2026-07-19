@@ -1,0 +1,119 @@
+name: Defect report
+description: Report a reproducible PartnerOps product or test defect
+title: "[Defect] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use synthetic or redacted evidence only. Never include passwords, API tokens, cookies, production records, private request bodies, or other secrets.
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the observable failure without assuming its cause.
+      placeholder: Replayed API response differs from the original response
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: Select the highest demonstrated user or business impact.
+      options:
+        - S1 — Critical (security breach, data loss, or service unavailable)
+        - S2 — High (release blocker or core workflow failure)
+        - S3 — Medium (workaround exists or non-core behavior fails)
+        - S4 — Low (minor usability or cosmetic issue)
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include commit SHA, local or GitHub run, OS/runtime, database, browser, and synthetic dataset where relevant.
+      placeholder: Commit, command or run URL, PostgreSQL/browser versions, fixture group
+    validations:
+      required: true
+
+  - type: textarea
+    id: preconditions
+    attributes:
+      label: Preconditions
+      description: State the minimum disposable state needed before reproduction.
+      placeholder: Current migrations, AppFixtures loaded, readiness healthy
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the shortest deterministic numbered sequence.
+      placeholder: |
+        1. Start from...
+        2. Send...
+        3. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: State the observable contract or user outcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: State what occurred, including safe status, header, DOM, or metric details.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: User or business impact
+      description: Explain who is affected and what work, confidentiality, or contract is at risk.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Link a sanitized run, trace, screenshot, log excerpt, or commit. Do not paste credentials or private data.
+      placeholder: Sanitized artifact URL, trace ID, screenshot, log excerpt, or commit
+    validations:
+      required: true
+
+  - type: textarea
+    id: investigation
+    attributes:
+      label: Root cause and fix
+      description: Optional until confirmed; cite a commit or pull request when fixed.
+      placeholder: Not yet confirmed, or verified cause and fix reference
+
+  - type: textarea
+    id: regression
+    attributes:
+      label: Regression coverage
+      description: Link the automated check, or state why coverage has not yet been added.
+      placeholder: Test path and scenario, or Not yet added — reason
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Evidence safety
+      options:
+        - label: I used only synthetic or redacted evidence and included no secrets, production records, or private request bodies.
+          required: true

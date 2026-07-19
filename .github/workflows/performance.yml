@@ -1,0 +1,164 @@
+name: Performance evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: performance-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-bookworm@sha256:92620daddcd947f8d5ab5ba66e848702fe443d87fed30c4cea8e389fd78dfc55
+        env:
+          POSTGRES_DB: partnerops_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d partnerops_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      API_TOKEN_PEPPER: performance-only-partnerops-pepper
+      APP_DEBUG: "0"
+      APP_ENV: test
+      APP_SECRET: performance-only-partnerops-secret
+      APP_TIMEZONE: Asia/Taipei
+      # Doctrine's test config appends _test, resolving this base name to the
+      # service-created partnerops_test database.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/partnerops?serverVersion=16&charset=utf8
+      DEFAULT_URI: http://localhost:8080
+      K6_IMAGE: grafana/k6:2.1.0@sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Prepare evidence directory
+        run: |
+          mkdir -p test-results
+          printf 'commit=%s\nrunner=%s %s\nrun=%s/%s/actions/runs/%s\n' \
+            "$GITHUB_SHA" "$RUNNER_OS" "$RUNNER_ARCH" "$GITHUB_SERVER_URL" \
+            "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > test-results/run-context.txt
+
+      - name: Set up PHP 8.4
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: "8.4"
+          extensions: ctype, iconv, intl, mbstring, opcache, pdo_pgsql
+          coverage: none
+          tools: composer:2.10.2
+
+      - name: Install PHP dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Migrate and load synthetic performance data
+        run: |
+          php scripts/reset-test-database.php
+          php bin/console doctrine:migrations:migrate --env=test --no-interaction
+          php bin/console doctrine:fixtures:load --env=test --group=AppFixtures --append --no-interaction
+          php bin/console doctrine:fixtures:load --env=test --group=performance --append --no-interaction
+
+      - name: Build production Apache image
+        run: |
+          docker build --target production --tag partnerops:performance .
+          docker image inspect partnerops:performance --format 'application_image_id={{.Id}}' \
+            >> test-results/run-context.txt
+          docker image inspect 'postgres:16-bookworm@sha256:92620daddcd947f8d5ab5ba66e848702fe443d87fed30c4cea8e389fd78dfc55' --format 'postgres_image={{index .RepoDigests 0}}' \
+            >> test-results/run-context.txt
+          printf 'k6_image=%s\n' "$K6_IMAGE" >> test-results/run-context.txt
+
+      - name: Start production Apache image
+        env:
+          APP_DEBUG: "0"
+          APP_ENV: prod
+          DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:5432/partnerops_test?serverVersion=16&charset=utf8
+        run: |
+          docker run --detach --name partnerops-performance-app \
+            --add-host host.docker.internal:host-gateway \
+            --publish 8080:8080 \
+            --env API_TOKEN_PEPPER \
+            --env APP_DEBUG \
+            --env APP_ENV \
+            --env APP_SECRET \
+            --env APP_TIMEZONE \
+            --env DATABASE_URL \
+            --env DEFAULT_URI \
+            partnerops:performance
+
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error http://localhost:8080/health/ready >/dev/null; then
+              exit 0
+            fi
+            if [[ "$(docker inspect --format '{{.State.Running}}' partnerops-performance-app)" != "true" ]]; then
+              break
+            fi
+            sleep 2
+          done
+          exit 1
+
+      - name: Run sequential 10,000-row benchmark
+        env:
+          BENCH_SAMPLES: "30"
+          BENCH_THRESHOLD_MS: "750"
+        run: |
+          set -o pipefail
+          ./scripts/benchmark.sh http://localhost:8080 2>&1 | tee test-results/benchmark.txt
+
+      - name: Run pinned 10-VU load profile
+        run: |
+          docker pull "$K6_IMAGE"
+          docker run --rm --network host \
+            --user "$(id -u):$(id -g)" \
+            --volume "$PWD/tests/load:/tests:ro" \
+            --volume "$PWD/test-results:/results" \
+            --env BASE_URL=http://localhost:8080 \
+            --env GIT_SHA="$GITHUB_SHA" \
+            --env K6_SUMMARY_PATH=/results/k6-summary.json \
+            --env RUNNER_DESCRIPTION="$RUNNER_OS-$RUNNER_ARCH" \
+            "$K6_IMAGE" run /tests/partnerops.js
+
+      - name: Capture bounded redacted application log
+        if: failure()
+        run: |
+          : > test-results/application.log
+          if docker inspect partnerops-performance-app >/dev/null 2>&1; then
+            docker logs --tail 300 partnerops-performance-app 2>&1 \
+              | sed -E \
+                  -e 's/(Bearer )[[:alnum:]_.-]+/\1[REDACTED]/g' \
+                  -e 's/ptk_[[:alnum:]_.-]+/[REDACTED_TOKEN]/g' \
+                  -e 's#(postgresql://[^:/[:space:]]+):[^@[:space:]]+@#\1:[REDACTED]@#g' \
+                  -e 's/PartnerOps!2026/[REDACTED_PASSWORD]/g' \
+                  -e 's/performance-only-partnerops-(pepper|secret)/[REDACTED_VALUE]/g' \
+              > test-results/application.log
+          else
+            printf '%s\n' 'Production application container was unavailable; no application log was emitted.' \
+              > test-results/application.log
+          fi
+
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: performance-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Stop production container
+        if: always()
+        run: docker rm --force partnerops-performance-app >/dev/null 2>&1 || true

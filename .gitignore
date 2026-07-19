@@ -23,3 +23,7 @@
 /phpunit.xml
 /.phpunit.cache/
 ###< phpunit/phpunit ###
+
+# Black-box reports, traces, screenshots, videos, benchmarks, and k6 output.
+/playwright-report/
+/test-results/
