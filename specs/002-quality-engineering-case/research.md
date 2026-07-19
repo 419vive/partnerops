@@ -111,12 +111,34 @@ custom report service were rejected because the repository has no measured need.
 using commits `725f342` and `c4e794a`, the current migration, and current
 regression evidence.
 
-**Rationale**: This is a real P1 commercial defect with an observable API impact,
-root cause, migration concern, and regression path. The report will explicitly
-state that the new Playwright suite did not discover the historical defect.
+**Rationale**: This is a real S2 defect tied to the P1 API-idempotency risk, with
+an observable API impact, root cause, migration concern, and regression path.
+The report will explicitly state that the new Playwright suite did not discover
+the historical defect.
 
 **Alternatives considered**: Inventing a demo defect, weakening the finding to a
 template, or claiming discovery by a new tool was rejected as unverifiable.
+
+## Decision 9: Preserve stateless CSRF semantics in non-browser load clients
+
+**Decision**: Curl and k6 send an explicit same-origin `Referer` for login POSTs,
+verify the success redirect, and require an authenticated session only after the
+POST. The initial login GET, which uses the stateless `authenticate` CSRF token,
+may legitimately return no session cookie.
+
+**Rationale**: Public run `29686451645` showed `POST /login → /login` before any
+measurement. `config/packages/csrf.yaml` marks `authenticate` stateless, and
+Symfony's `SameOriginCsrfTokenManager` rejects a POST when Fetch Metadata,
+Origin/Referer, and double-submit evidence are all absent. Chromium supplied the
+browser headers; curl and k6 did not. After adding same-origin evidence, run
+`29687240168` proved the sequential path but exposed k6's separate false
+assumption that GET must create an anonymous session. Final run `29687399527`
+executed both profiles successfully at commit `8e3f801`.
+
+**Alternatives considered**: Disabling stateless CSRF, switching the production
+image to `APP_ENV=test`, weakening Secure-cookie policy, hard-coding a session,
+or accepting any `302` were rejected because each would lower security or hide
+authentication failure instead of modeling the browser contract.
 
 ## Version and repository checks
 
@@ -127,4 +149,6 @@ template, or claiming discovery by a new tool was rejected as unverifiable.
 - PartnerOps `main` was clean at commit `5c855e8` before feature creation, and
   public CI run `29642823042` was the existing green baseline.
 
-All technical unknowns are resolved.
+Planning unknowns were resolved before implementation; the runtime addendum above
+records and closes the client-contract gap discovered only on the public Linux
+production-image path.
