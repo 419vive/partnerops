@@ -36,6 +36,8 @@ jobs:
       APP_ENV: test
       APP_SECRET: performance-only-partnerops-secret
       APP_TIMEZONE: Asia/Taipei
+      # Doctrine's test config appends _test, resolving this base name to the
+      # service-created partnerops_test database.
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/partnerops?serverVersion=16&charset=utf8
       DEFAULT_URI: http://localhost:8080
       K6_IMAGE: grafana/k6:2.1.0@sha256:65c920dc067d5e2e00befbf982af6ad6ad0117034e8b1c65817c7975c52d4669

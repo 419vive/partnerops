@@ -6,7 +6,7 @@
 | Status | Verified and closed |
 | Observed | 2026-07-18 while aligning the regression gate with PostgreSQL |
 | Affected state | `idempotency_record.response_body` stored as PostgreSQL `jsonb` before forward migration `Version20260718000100` |
-| Contract | Replaying the same credential, idempotency key, and validated payload within 24 hours returns the original `201` response body byte for byte |
+| Contract | Replaying the same credential, idempotency key, and validated payload within 24 hours returns the original `201` response body byte-for-byte |
 
 ## Discovery boundary
 
@@ -41,7 +41,7 @@ and idempotency record exist.
 
 ## Actual result
 
-PostgreSQL `jsonb` normalized object key order. The replay contained the same JSON
+PostgreSQL `jsonb` normalizes object key order. The replay contained the same JSON
 values but serialized in a different order, so its bytes differed from the first
 response. The repository evidence does not show a duplicate request or lost data;
 the defect was a violation of the promised replay contract.
