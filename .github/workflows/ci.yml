@@ -184,6 +184,13 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Show web server log on failure
+      - name: Show bounded redacted application logs on failure
         if: failure()
-        run: test ! -f /tmp/partnerops-http.log || cat /tmp/partnerops-http.log
+        run: |
+          (tail -n 300 /tmp/partnerops-http.log var/log/test.log 2>/dev/null || true) \
+            | sed -E \
+                -e 's/(Bearer )[[:alnum:]_.-]+/\1[REDACTED]/g' \
+                -e 's/ptk_[[:alnum:]_.-]+/[REDACTED_TOKEN]/g' \
+                -e 's#(postgresql://[^:/[:space:]]+):[^@[:space:]]+@#\1:[REDACTED]@#g' \
+                -e 's/PartnerOps!2026/[REDACTED_PASSWORD]/g' \
+                -e 's/ci-only-partnerops-(api-token-pepper|app-secret)/[REDACTED_VALUE]/g'
