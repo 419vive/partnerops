@@ -28,7 +28,7 @@ test('team member completes the urgent request workflow', async ({ page }) => {
   await expect(page.getByRole('status')).toContainText('請求狀態已更新');
   await expect(page.getByRole('article').filter({ hasText: '狀態由「新建」變更為「處理中」' })).toBeVisible();
 
-  await page.getByLabel('留言').fill(INTERNAL_UPDATE);
+  await page.getByRole('textbox', { name: '留言', exact: true }).fill(INTERNAL_UPDATE);
   await page.getByLabel('僅團隊內部可見').check();
   await page.getByRole('button', { name: '新增留言' }).click();
   await expect(page.getByRole('status')).toContainText('留言已新增');
